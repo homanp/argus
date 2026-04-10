@@ -5,17 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const notes = [
   {
     title: "Desktop-safe URLs",
-    description: "Hash history keeps navigation self-contained in the webview, which makes Tauri packaging and reload behavior simpler.",
+    description:
+      "Hash history keeps navigation self-contained in the webview, which makes Tauri packaging and reload behavior simpler.",
     icon: Hash,
   },
   {
     title: "Typed route APIs",
-    description: "TanStack Router gives you type-safe paths, params, search state, and navigation calls as the app grows.",
+    description:
+      "TanStack Router gives you type-safe paths, params, search state, and navigation calls as the app grows.",
     icon: Route,
   },
   {
     title: "Good default for Argus",
-    description: "This setup is a strong foundation if you plan to add multiple views like settings, dashboards, or detail pages.",
+    description:
+      "This setup is a strong foundation if you plan to add multiple views like settings, dashboards, or detail pages.",
     icon: ShieldCheck,
   },
 ]
@@ -31,8 +34,8 @@ function AboutPage() {
           TanStack Router is now the navigation layer for this app.
         </h1>
         <p className="max-w-3xl text-base text-muted-foreground sm:text-lg">
-          The app uses a hash-based router so Tauri can treat the desktop shell as a single entry
-          point while still giving you typed client-side navigation.
+          The app uses a hash-based router so Tauri can treat the desktop shell as a single entry point while still
+          giving you typed client-side navigation.
         </p>
       </section>
 

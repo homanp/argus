@@ -1,14 +1,7 @@
 import { ArrowUpRight, MonitorSmartphone, PanelsTopLeft, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 const stack = ["Tauri 2", "React", "Vite", "TypeScript", "shadcn/ui"]
 
@@ -47,17 +40,14 @@ function App() {
             Tauri 2 + shadcn/ui, wired and ready to build on.
           </h1>
           <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-            This scaffold gives you a native desktop shell backed by Rust, with a React and Vite
-            frontend styled through Tailwind CSS v4 and shadcn/ui components.
+            This scaffold gives you a native desktop shell backed by Rust, with a React and Vite frontend styled through
+            Tailwind CSS v4 and shadcn/ui components.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {stack.map((item) => (
-            <span
-              key={item}
-              className="rounded-full border bg-background px-3 py-1 text-sm text-muted-foreground"
-            >
+            <span key={item} className="rounded-full border bg-background px-3 py-1 text-sm text-muted-foreground">
               {item}
             </span>
           ))}
@@ -87,8 +77,8 @@ function App() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Start editing <code className="rounded bg-muted px-1.5 py-0.5">src/router.tsx</code>{" "}
-                and add more routed screens as your app grows.
+                Start editing <code className="rounded bg-muted px-1.5 py-0.5">src/router.tsx</code> and add more routed
+                screens as your app grows.
               </p>
             </CardContent>
             <CardFooter>

@@ -1,73 +1,141 @@
-# React + TypeScript + Vite
+# argus
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**the post-prompt agent**
 
-Currently, two official plugins are available:
+_today's AI waits for you to type. argus doesn't._
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## why this exists
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+every AI product on the market today is reactive. you type a prompt, it responds. you ask a question, it answers. you upload a file, it summarizes. the pattern is identical across chatgpt, claude, copilot, perplexity, cursor, and every agent platform that raised a hundred million dollars last year. nothing happens until you start the conversation.
 
-## Expanding the ESLint configuration
+this is strange, because we keep calling these things agents. the word "agent" comes from the latin _agere_, which means to do, to act. a thing that only acts when you prompt it isn't really an agent. it's a search box with more words.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+what we actually shipped as an industry is **prompt-gated AI**. a billion dollars worth of brilliant models sitting in a waiting room, doing nothing until a human types the first word. the intelligence is real. the proactivity is not.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+this is the gap argus closes. argus is the part that happens before the prompt. it watches the events you care about across every tool you use, notices the things that matter, decides what to do about them, and either does them or surfaces a decision for you. the intelligence doesn't wait for you to summon it. it's already running.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+we think of argus as a **post-prompt agent**. the loop isn't "you type, it responds." the loop is "the world changes, argus notices, argus acts, and occasionally argus asks you about something only you can decide." you're no longer the trigger. you're the exception handler.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+the test for whether something is really an agent or just a chatbot in costume is simple: does it do anything when you're not looking at it? if the answer is no, it's prompt-gated. if the answer is yes, you have an agent.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## what "proactive" actually means
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+being proactive is not the same as being chatty. plenty of AI products send you notifications, but the notifications are still downstream of a prompt you gave them earlier. "let me know when my flight price drops" is just a delayed prompt. the agent is still waiting to be told what to care about, one job at a time.
+
+real proactivity means the agent forms its own model of what you care about and keeps that model current without being asked. it learns that you protect your prep blocks, that you respond to investors fast, that you've offered credits instead of refunds 61% of the time in the last year, that your daughter's track finals matter more than a $126 flight savings. nobody told argus any of this. it figured it out from watching how you actually behave.
+
+and then the real test: does the agent act on that model without checking in for every small decision? argus auto-handles 239 things a day because the confidence is high and the action is reversible. only 4 things end up in the inbox. the 4 things aren't "tasks queued for you to do." they're the specific cases where a human value judgment is required and argus knows it.
+
+this is the inversion. most AI products try to earn their keep by doing more, talking more, surfacing more. argus earns its keep by doing less visible work, more silent work, and only appearing when it has to.
+
+the best agent is the one you forget is running.
+
+---
+
+## what it actually does
+
+four real scenarios from a single day.
+
+**a $2,400 refund request comes in via stripe.** argus pulls the customer's 12 months of history, cross-references linkedin (the company just announced a restructure), checks the brin trust score, and looks at how i've handled 23 similar churn cases in the past. 61% of the time i offered a credit instead of a full refund. argus recommends a 50% credit and shows me the 6-step plan it would execute if i approve. i press 1. it's done in 9 seconds.
+
+**an investor asks to reschedule.** argus notices the only good slot collides with a prep block i said never to schedule over. it tells me i've broken that rule 3 times in 90 days, all for investors, and that this investor's last reschedule took 11 days to land. it doesn't pick for me. it surfaces the trade-off. this is a values call, not a data call.
+
+**a github PR fixes a real bug but changes the public API.** the fix touches 4 downstream services and a public endpoint that gets 340 external calls per day. argus recommends splitting into two PRs with a 2-week deprecation notice, the same pattern my team has used 6 times before without a single customer complaint. this one isn't handled by the default agent. i run argus code on grok for code work, and it shows up tagged that way in the inbox.
+
+**a flight price drop hits my threshold.** normally argus just books it. but this time the departure conflicts with my daughter's regional track finals. argus suggests the next-day flight at $126 more and tells me she's been training for this qualifier for months. confidence 0.68. "values call." it won't override a parent.
+
+the pattern in all four: argus doesn't just react to events. it pulls context from everywhere, forms an opinion, and shows its work before asking.
+
+---
+
+## show your work
+
+every decision argus surfaces has four things: an **analysis** in prose that reads like a memo from a thoughtful analyst, a **plan** showing exactly what argus will do if you approve (with per-step tool calls, time estimates, and reversibility indicators), the raw **signals** it ingested, and a timeline of **similar past decisions** from your own history.
+
+the signals section is the one that people don't expect. instead of stats, you see the actual receipts. the webhook payload that triggered the decision. the API response argus pulled. the linkedin post it scraped, with the URL. the brin trust score and its four dimensions. the SQL query argus ran against its own memory of your past decisions.
+
+if you want to audit whether argus is making things up, click "view raw" on any signal. nothing is hidden.
+
+most agent products show you a conclusion and ask for approval. argus shows you the conclusion, the reasoning, the plan, and every source it used to get there. the whole thing is legible.
+
+---
+
+## bring your own brain
+
+argus doesn't care which LLM you run it on. claude, grok, gpt-5, gemini, mistral, or your own local llama. each agent can be scoped to specific tasks. code goes to grok. mail drafts go to gpt-5. customer data stays on the local llama and never leaves your machine.
+
+this matters for two reasons.
+
+first, you shouldn't be locked into one model vendor. the best agent for drafting an investor email is not the best agent for reviewing a PR. argus routes based on the task, not the vendor's marketing budget.
+
+second, and this is the one that actually matters, some of your data should never touch a cloud LLM. customer records. strategy docs. legal correspondence. user conversations. with argus you pin those workloads to a local model and that's it. your data, your brain, your machine.
+
+this is the thing anthropic, openai, and xai structurally cannot ship. their business model depends on you using their model. argus's doesn't. we make money on the trust layer underneath, not on the inference.
+
+---
+
+## the five things argus watches
+
+argus is built around five concepts. each one is a first-class view in the UI, each one does one job well, and together they cover the full loop from event to action to notification.
+
+**connectors** are the sources argus watches. gmail, calendar, stripe, github, linear, slack, x, rss feeds, custom webhooks. any system that can emit an event or expose an API is a connector. you add them once, scope their permissions, and argus starts watching.
+
+**triggers** are reactive rules. when `stripe.charge.failed` and amount over $500, argus drafts an apology email and flags your inbox. when `github.pr.opened` by dependabot, argus verifies with brin, runs tests, and auto-merges if clean. each trigger has a condition and an action, both in plain english.
+
+**schedules** are proactive rules. 30 minutes before any meeting, research the attendees and draft talking points. every friday at 16:00, pull the week's stripe numbers and post the revenue report to slack #wins. every morning at 07:00, read 24 rss feeds and draft a priority digest. schedules are how argus stays ahead of you.
+
+**channels** are where argus reaches you. push, slack, email digest, imessage, apple watch, webhook to your own infrastructure. but channels aren't just endpoints. argus has smart routing rules that decide which channel to use based on the decision. high stakes and low confidence? push plus sms. code work during work hours? slack #engineering. auto-handled stuff? batch into the 17:00 email digest. security blocks? sms immediately. the routing is the brain.
+
+**agents** are the LLMs that do the actual thinking. the default agent is opinionated and generalist. you can add specialized agents for specific tasks — argus code on grok, argus mail on gpt-5, a local llama for anything touching private data. each agent has a scope and argus routes automatically.
+
+five concepts. each one is a wedge that closed cloud-first agent platforms structurally cannot match.
+
+---
+
+## the daily ritual
+
+the whole product is designed around this loop:
+
+you open argus in the morning. the "today" view shows everything in 10 seconds. needs you, right now, recent, sources, triggers. if nothing needs you, you close the window. if something does, you click into the inbox.
+
+the inbox is a list of decision cards. each card has argus's recommendation, its reasoning in 3-4 sentences, a confidence score, and three inline action buttons with keyboard shortcuts. press 1, 2, or 3 and move on. most cards clear in under 15 seconds. the whole inbox clears in under 2 minutes.
+
+if you want to dig in, the detail view has the full analysis, plan, signals, historical comparison, and a conversation thread where you can push back on argus's reasoning before deciding. this is where argus stops being a filter and becomes a thinking partner.
+
+you do this three times a day. morning, midday, evening. each check-in is under a minute. the rest of the day argus is quietly handling 239 things you never had to think about.
+
+that's what 98% handled looks like from the inside. it doesn't feel like magic. it feels like nothing at all. which is the point.
+
+---
+
+## who this is for
+
+founders and operators who live in 10 browser tabs. developers who like the way linear feels and want that density for their own work and life. privacy-conscious engineers who refuse to pipe everything through a cloud LLM. security-minded teams who need to prove every agent action was verified. anyone who's tired of being interrupted by AI products that promised to save them time.
+
+if you want a chatbot, argus is not for you. if you want an assistant that proves it's working by talking to you a lot, argus is not for you. if you want something that handles the boring stuff silently and only speaks up when it actually matters, welcome.
+
+---
+
+## getting started
+
+_technical setup, installation, configuration, and architecture documentation will live here._
+
+_(coming soon)_
+
+---
+
+## contributing
+
+argus is built in the open and we take contributions seriously. issues, PRs, and feature requests are all welcome. there's no CLA, no corporate approval process, no "community edition vs enterprise edition" split. one codebase, MIT license, forever.
+
+see `CONTRIBUTING.md` for development setup and guidelines.
+
+---
+
+## license
+
+MIT. do what you want with it.

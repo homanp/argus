@@ -1,11 +1,4 @@
-import {
-  Link,
-  Outlet,
-  createHashHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-} from "@tanstack/react-router"
+import { Link, Outlet, createHashHistory, createRootRoute, createRoute, createRouter } from "@tanstack/react-router"
 
 import App from "@/App"
 import { buttonVariants } from "@/components/ui/button"
@@ -14,7 +7,7 @@ import AboutPage from "@/pages/about-page"
 
 const navLinkClassName = cn(
   buttonVariants({ variant: "ghost", size: "sm" }),
-  "data-[status=active]:bg-primary data-[status=active]:text-primary-foreground data-[status=active]:hover:bg-primary/90"
+  "data-[status=active]:bg-primary data-[status=active]:text-primary-foreground data-[status=active]:hover:bg-primary/90",
 )
 
 function RootLayout() {

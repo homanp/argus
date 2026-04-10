@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-ssr
+package-lock.json
+.husky/_
+src-tauri/target
+src-tauri/gen
+src-tauri/Cargo.lock
