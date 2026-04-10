@@ -12,8 +12,10 @@ import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import AboutPage from "@/pages/about-page"
 
-const navLinkClassName = buttonVariants({ variant: "ghost", size: "sm" })
-const activeNavLinkClassName = buttonVariants({ variant: "default", size: "sm" })
+const navLinkClassName = cn(
+  buttonVariants({ variant: "ghost", size: "sm" }),
+  "data-[status=active]:bg-primary data-[status=active]:text-primary-foreground data-[status=active]:hover:bg-primary/90"
+)
 
 function RootLayout() {
   return (
@@ -26,18 +28,10 @@ function RootLayout() {
           </div>
 
           <nav className="flex items-center gap-2">
-            <Link
-              to="/"
-              className={cn(navLinkClassName)}
-              activeProps={{ className: activeNavLinkClassName }}
-            >
+            <Link to="/" className={navLinkClassName} activeOptions={{ exact: true }}>
               Home
             </Link>
-            <Link
-              to="/about"
-              className={cn(navLinkClassName)}
-              activeProps={{ className: activeNavLinkClassName }}
-            >
+            <Link to="/about" className={navLinkClassName} activeOptions={{ exact: true }}>
               About
             </Link>
           </nav>
