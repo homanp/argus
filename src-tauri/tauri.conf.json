@@ -10,13 +10,21 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Argus",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "transparent": true,
         "width": 800,
         "height": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "windowEffects": {
+          "effects": ["underWindowBackground"],
+          "state": "active"
+        }
       }
     ],
     "security": {
