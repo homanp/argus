@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-white/8 pt-9">
-      <SidebarContent className="px-1 pt-1 pb-2">
+      <SidebarContent className="px-2.5 pt-1 pb-2">
         <SidebarGroup className="px-0 pt-0">
           <SidebarMenu>
             {primaryNavigation.map((item) => (
