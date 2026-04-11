@@ -55,7 +55,7 @@ type DecisionCardData = {
 
 const primaryNavigation: NavigationItem[] = [
   {
-    title: "Signals",
+    title: "Missions",
     icon: ActivitySparkIcon,
     count: "4",
     href: "/",
@@ -225,10 +225,10 @@ const decisionCards: DecisionCardData[] = [
   },
 ]
 
-const signalsHeader = {
-  title: "Signals",
+const missionsHeader = {
+  title: "Missions",
   subtitle: "4 waiting · ~2 min to clear · routed to your channels",
 }
 
-export { decisionCards, openTasks, primaryNavigation, signalsHeader, workspaceNavigation }
+export { decisionCards, openTasks, primaryNavigation, missionsHeader, workspaceNavigation }
 export type { DecisionCardData, NavigationItem, TaskItem }

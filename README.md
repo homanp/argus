@@ -54,11 +54,11 @@ the pattern in all four: argus doesn't just react to events. it pulls context fr
 
 ## show your work
 
-every decision argus surfaces has four things: an **analysis** in prose that reads like a memo from a thoughtful analyst, a **plan** showing exactly what argus will do if you approve (with per-step tool calls, time estimates, and reversibility indicators), the raw **signals** it ingested, and a timeline of **similar past decisions** from your own history.
+every decision argus surfaces has four things: an **analysis** in prose that reads like a memo from a thoughtful analyst, a **plan** showing exactly what argus will do if you approve (with per-step tool calls, time estimates, and reversibility indicators), the raw **missions** it ingested, and a timeline of **similar past decisions** from your own history.
 
-the signals section is the one that people don't expect. instead of stats, you see the actual receipts. the webhook payload that triggered the decision. the API response argus pulled. the linkedin post it scraped, with the URL. the brin trust score and its four dimensions. the SQL query argus ran against its own memory of your past decisions.
+the missions section is the one that people don't expect. instead of stats, you see the actual receipts. the webhook payload that triggered the decision. the API response argus pulled. the linkedin post it scraped, with the URL. the brin trust score and its four dimensions. the SQL query argus ran against its own memory of your past decisions.
 
-if you want to audit whether argus is making things up, click "view raw" on any signal. nothing is hidden.
+if you want to audit whether argus is making things up, click "view raw" on any mission item. nothing is hidden.
 
 most agent products show you a conclusion and ask for approval. argus shows you the conclusion, the reasoning, the plan, and every source it used to get there. the whole thing is legible.
 
@@ -104,7 +104,7 @@ you open argus in the morning. the "today" view shows everything in 10 seconds. 
 
 the inbox is a list of decision cards. each card has argus's recommendation, its reasoning in 3-4 sentences, a confidence score, and three inline action buttons with keyboard shortcuts. press 1, 2, or 3 and move on. most cards clear in under 15 seconds. the whole inbox clears in under 2 minutes.
 
-if you want to dig in, the detail view has the full analysis, plan, signals, historical comparison, and a conversation thread where you can push back on argus's reasoning before deciding. this is where argus stops being a filter and becomes a thinking partner.
+if you want to dig in, the detail view has the full analysis, plan, missions, historical comparison, and a conversation thread where you can push back on argus's reasoning before deciding. this is where argus stops being a filter and becomes a thinking partner.
 
 you do this three times a day. morning, midday, evening. each check-in is under a minute. the rest of the day argus is quietly handling 239 things you never had to think about.
 

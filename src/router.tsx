@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { signalsHeader } from "@/lib/app-shell-data"
+import { missionsHeader } from "@/lib/app-shell-data"
 
 function RootLayout() {
   return (
@@ -31,8 +31,8 @@ function RootLayout() {
               <SidebarTrigger className="size-6 rounded-sm p-0 text-white/35 hover:bg-white/[0.03] hover:text-white/70 md:hidden" />
               <HugeIcon icon={ActivitySparkIcon} size={12} className="text-white/35" />
               <div className="flex min-w-0 items-center gap-2 text-[12px]">
-                <p className="font-medium text-white">{signalsHeader.title}</p>
-                <p className="truncate text-[11px] text-white/30">{signalsHeader.subtitle}</p>
+                <p className="font-medium text-white">{missionsHeader.title}</p>
+                <p className="truncate text-[11px] text-white/30">{missionsHeader.subtitle}</p>
               </div>
             </div>
 
