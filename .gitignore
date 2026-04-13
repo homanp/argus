@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Relay runtime data
+relay/data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
