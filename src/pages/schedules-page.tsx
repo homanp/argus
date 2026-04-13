@@ -7,30 +7,8 @@ import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { ScheduleSheet } from "@/components/schedule-sheet"
 import { deleteSchedule, getSchedules, updateSchedule, type Schedule } from "@/lib/relay-api"
+import { humanCron, relativeTime } from "@/lib/schedule-utils"
 import { cn } from "@/lib/utils"
-
-const CRON_LABELS: Record<string, string> = {
-  "0 * * * *": "Every hour",
-  "0 9 * * *": "Daily at 9 AM",
-  "0 9 * * 1-5": "Weekdays at 9 AM",
-  "0 9 * * 1": "Weekly on Monday",
-  "0 9 1 * *": "Monthly on the 1st",
-}
-
-function humanCron(expression: string) {
-  return CRON_LABELS[expression] ?? expression
-}
-
-function relativeTime(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now()
-  if (diff <= 0) return "now"
-  const minutes = Math.floor(diff / 60_000)
-  if (minutes < 60) return `in ${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `in ${hours}h`
-  const days = Math.floor(hours / 24)
-  return `in ${days}d`
-}
 
 function TogglePill({ active, disabled, onClick }: { active: boolean; disabled?: boolean; onClick: () => void }) {
   return (
