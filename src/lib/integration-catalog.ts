@@ -26,6 +26,7 @@ type IntegrationCatalogItem = {
   category: IntegrationCategory
   available: boolean
   icon: AppIcon
+  image?: string
 }
 
 const integrationCategories: IntegrationCategory[] = [
@@ -46,6 +47,7 @@ const integrationCatalog: IntegrationCatalogItem[] = [
     category: "Developer tools",
     available: true,
     icon: Github01Icon,
+    image: "/github.svg",
   },
   {
     provider: "linear",

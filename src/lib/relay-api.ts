@@ -16,6 +16,7 @@ type GitHubIntegrationRepository = {
   selected: boolean
   webhookUrl: string | null
   webhookSecret: string | null
+  webhookManaged: boolean
   webhookStatus: string
   webhookLastReceivedAt: string | null
   htmlUrl: string
@@ -42,6 +43,54 @@ type GitHubIntegrationState = {
   account: GitHubIntegrationAccount | null
   repositories: GitHubIntegrationRepository[]
   recentEvents: GitHubWebhookEvent[]
+}
+
+type TriggerCondition = {
+  field: string
+  operator: "equals" | "not_equals" | "contains"
+  value: string
+}
+
+type Trigger = {
+  id: string
+  name: string
+  provider: string
+  eventType: string
+  conditions: TriggerCondition[]
+  actionPrompt: string | null
+  enabled: boolean
+  executionCount: number
+  lastFiredAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type TriggerExecution = {
+  id: number
+  matchedAt: string
+  webhookEventId: number
+  eventType: string | null
+  repositoryId: string | null
+  payload: Record<string, unknown> | null
+  receivedAt: string | null
+}
+
+type TriggerDetailResponse = {
+  trigger: {
+    id: string
+    name: string
+    provider: string
+    eventType: string
+    conditions: TriggerCondition[]
+    actionPrompt: string | null
+    enabled: boolean
+  }
+  executions: TriggerExecution[]
+}
+
+type AvailableEventsResponse = {
+  events: string[]
+  source: "github_api" | "static_fallback"
 }
 
 const RELAY_BASE_URL = "http://127.0.0.1:8787"
@@ -99,13 +148,76 @@ async function sendGitHubWebhookTest(repositoryId: string) {
   })
 }
 
+async function getGitHubAvailableEvents() {
+  return request<AvailableEventsResponse>("/api/integrations/github/available-events")
+}
+
+async function getTriggers() {
+  return request<Trigger[]>("/api/triggers")
+}
+
+async function createTrigger(data: {
+  name: string
+  provider: string
+  eventType: string
+  conditions?: TriggerCondition[]
+  actionPrompt?: string
+  enabled?: boolean
+}) {
+  return request<Trigger>("/api/triggers", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+async function updateTrigger(
+  triggerId: string,
+  data: Partial<{
+    name: string
+    provider: string
+    eventType: string
+    conditions: TriggerCondition[]
+    actionPrompt: string
+    enabled: boolean
+  }>,
+) {
+  return request<Trigger>(`/api/triggers/${triggerId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteTrigger(triggerId: string) {
+  return request<{ ok: true }>(`/api/triggers/${triggerId}`, {
+    method: "DELETE",
+  })
+}
+
+async function getTriggerExecutions(triggerId: string) {
+  return request<TriggerDetailResponse>(`/api/triggers/${triggerId}/executions`)
+}
+
 export {
   RELAY_BASE_URL,
   connectGitHub,
+  createTrigger,
+  deleteTrigger,
+  getGitHubAvailableEvents,
   getGitHubIntegration,
+  getTriggerExecutions,
+  getTriggers,
   prepareGitHubRepositoryWebhook,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
+  updateTrigger,
 }
-export type { GitHubIntegrationRepository, GitHubIntegrationState }
+export type {
+  AvailableEventsResponse,
+  GitHubIntegrationRepository,
+  GitHubIntegrationState,
+  Trigger,
+  TriggerCondition,
+  TriggerDetailResponse,
+  TriggerExecution,
+}
