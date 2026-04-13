@@ -1,6 +1,6 @@
 "use client"
 
-import { Link } from "@tanstack/react-router"
+import { Link, useRouterState } from "@tanstack/react-router"
 import { GithubIcon, Settings01Icon } from "@hugeicons/core-free-icons"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
@@ -19,6 +19,11 @@ import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-she
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
+
   return (
     <Sidebar collapsible="icon" className="border-white/8 pt-9">
       <SidebarContent className="px-2.5 pt-1 pb-2">
@@ -29,7 +34,7 @@ function AppSidebar() {
                 {item.href ? (
                   <SidebarMenuButton
                     render={<Link to={item.href} />}
-                    isActive
+                    isActive={isActivePath(item.href)}
                     className="h-7 rounded-md px-2.5 text-[13px] text-white/78 data-active:bg-white/8 data-active:text-white hover:bg-white/5 hover:text-white"
                     tooltip={item.title}
                   >
@@ -70,16 +75,31 @@ function AppSidebar() {
           <SidebarMenu>
             {workspaceNavigation.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
-                  tooltip={item.title}
-                >
-                  <HugeIcon icon={item.icon} size={16} className="text-white/50" />
-                  <span>{item.title}</span>
-                  {item.count ? (
-                    <span className="ml-auto text-[11px] tabular-nums text-white/40">{item.count}</span>
-                  ) : null}
-                </SidebarMenuButton>
+                {item.href ? (
+                  <SidebarMenuButton
+                    render={<Link to={item.href} />}
+                    isActive={isActivePath(item.href)}
+                    className="h-7 rounded-md px-2.5 text-[13px] text-white/70 data-active:bg-white/8 data-active:text-white hover:bg-white/5 hover:text-white"
+                    tooltip={item.title}
+                  >
+                    <HugeIcon icon={item.icon} size={16} className="text-white/50 data-[active=true]:text-white" />
+                    <span>{item.title}</span>
+                    {item.count ? (
+                      <span className="ml-auto text-[11px] tabular-nums text-white/40">{item.count}</span>
+                    ) : null}
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+                    tooltip={item.title}
+                  >
+                    <HugeIcon icon={item.icon} size={16} className="text-white/50" />
+                    <span>{item.title}</span>
+                    {item.count ? (
+                      <span className="ml-auto text-[11px] tabular-nums text-white/40">{item.count}</span>
+                    ) : null}
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>

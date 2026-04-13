@@ -7,8 +7,8 @@ import {
   Airplane01Icon,
   Calendar03Icon,
   ChartUpIcon,
+  ConnectIcon,
   Github01Icon,
-  LinkSquare01Icon,
   Mail01Icon,
   Notification03Icon,
   Pulse02Icon,
@@ -80,8 +80,9 @@ const primaryNavigation: NavigationItem[] = [
 const workspaceNavigation: NavigationItem[] = [
   {
     title: "Connectors",
-    icon: LinkSquare01Icon,
-    count: "9",
+    icon: ConnectIcon,
+    count: "1",
+    href: "/connectors",
   },
   {
     title: "Triggers",

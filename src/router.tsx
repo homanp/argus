@@ -1,19 +1,61 @@
 import type { CSSProperties } from "react"
 
-import { createHashHistory, createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router"
-import { ActivitySparkIcon } from "@hugeicons/core-free-icons"
+import {
+  createHashHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  useRouterState,
+} from "@tanstack/react-router"
+import { ActivitySparkIcon, ArrowLeft02Icon, ConnectIcon, Search01Icon } from "@hugeicons/core-free-icons"
+
+import { Link } from "@tanstack/react-router"
 
 import App from "@/App"
 import { AppSidebar } from "@/components/app-sidebar"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
+import { integrationCatalog } from "@/lib/integration-catalog"
+import IntegrationDetailPage from "@/pages/integration-detail-page"
+import IntegrationsPage from "@/pages/integrations-page"
+
+const routeHeaderMap = {
+  "/": {
+    ...missionsHeader,
+    icon: ActivitySparkIcon,
+  },
+  "/connectors": {
+    title: "Connectors",
+    subtitle: "Catalog, setup, and webhook configuration",
+    icon: ConnectIcon,
+  },
+} as const
 
 function RootLayout() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const isConnectorsRoute = pathname === "/connectors" || pathname.startsWith("/connectors/")
+  const header = pathname.startsWith("/connectors/")
+    ? {
+        title: "Connector detail",
+        subtitle: "Setup, webhook configuration, and testing",
+        icon: ConnectIcon,
+      }
+    : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
+
+  const providerSlug = pathname.startsWith("/connectors/") ? pathname.split("/").filter(Boolean)[1] : null
+  const providerTitle = providerSlug
+    ? (integrationCatalog.find((item) => item.provider === providerSlug)?.title ?? providerSlug)
+    : null
+
   return (
     <div className="relative min-h-svh">
-      <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-50 h-8" />
+      <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-40 h-8" />
       <SidebarProvider
         defaultOpen
         className="min-h-svh flex-1"
@@ -26,29 +68,73 @@ function RootLayout() {
       >
         <AppSidebar />
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent pt-0">
-          <header className="z-10 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
+          <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="size-6 rounded-sm p-0 text-white/35 hover:bg-white/[0.03] hover:text-white/70 md:hidden" />
-              <HugeIcon icon={ActivitySparkIcon} size={12} className="text-white/35" />
-              <div className="flex min-w-0 items-center gap-2 text-[12px]">
-                <p className="font-medium text-white">{missionsHeader.title}</p>
-                <p className="truncate text-[11px] text-white/30">{missionsHeader.subtitle}</p>
-              </div>
+              {providerTitle ? (
+                <Link
+                  to="/connectors"
+                  className="flex size-6 items-center justify-center rounded-md border border-white/10 text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/80"
+                >
+                  <HugeIcon icon={ArrowLeft02Icon} size={14} />
+                </Link>
+              ) : (
+                <HugeIcon icon={header.icon} size={12} className="text-white/35" />
+              )}
+              <nav className="flex min-w-0 items-center gap-1 text-[12px]">
+                {isConnectorsRoute ? (
+                  <>
+                    <Link
+                      to="/connectors"
+                      className={`font-medium transition-colors ${providerTitle ? "text-white/45 hover:text-white/70" : "text-white"}`}
+                    >
+                      Connectors
+                    </Link>
+                    {providerTitle ? (
+                      <>
+                        <span className="text-white/20">/</span>
+                        <p className="truncate font-medium text-white">{providerTitle}</p>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-white">{header.title}</p>
+                    <p className="truncate text-[11px] text-white/30">{header.subtitle}</p>
+                  </>
+                )}
+              </nav>
             </div>
 
             <div className="hidden items-center gap-1 md:flex">
-              <Button
-                variant="ghost"
-                className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
-              >
-                Filter
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
-              >
-                Mark all reviewed
-              </Button>
+              {isConnectorsRoute ? (
+                <div className="relative">
+                  <HugeIcon
+                    icon={Search01Icon}
+                    size={14}
+                    className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-white/35"
+                  />
+                  <Input
+                    placeholder="Search connectors..."
+                    className="h-7 w-52 rounded-md border-white/8 bg-white/[0.03] pl-8 !text-[12px] text-white/70 placeholder:text-white/30"
+                  />
+                </div>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
+                  >
+                    Filter
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
+                  >
+                    Mark all reviewed
+                  </Button>
+                </>
+              )}
             </div>
           </header>
 
@@ -71,7 +157,19 @@ const indexRoute = createRoute({
   component: App,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute])
+const connectorsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/connectors",
+  component: IntegrationsPage,
+})
+
+const connectorDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/connectors/$provider",
+  component: IntegrationDetailPage,
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, connectorsRoute, connectorDetailRoute])
 
 export const router = createRouter({
   routeTree,

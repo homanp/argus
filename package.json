@@ -13,6 +13,9 @@
     "preview": "vite preview",
     "pre-commit": "lint-staged && npm run lint && npm run build",
     "prepare": "husky",
+    "relay:check": "npm --prefix relay run check",
+    "relay:dev": "npm --prefix relay run dev",
+    "relay:start": "npm --prefix relay run start",
     "tauri": "tauri"
   },
   "dependencies": {
