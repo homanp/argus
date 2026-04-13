@@ -114,6 +114,7 @@ function ScheduleDetailPage() {
     getScheduleExecutions(scheduleId)
       .then((result) => {
         setData(result)
+        setError(null)
         syncNavbar(result.schedule.name, result.schedule.enabled)
       })
       .catch((err) => {
