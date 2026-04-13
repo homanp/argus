@@ -235,6 +235,13 @@ async function getTriggerExecutions(triggerId: string) {
   return request<TriggerDetailResponse>(`/api/triggers/${triggerId}/executions`)
 }
 
+async function previewSchedule(cronExpression: string, timezone?: string) {
+  return request<{ runs: string[] }>("/api/schedules/preview", {
+    method: "POST",
+    body: JSON.stringify({ cronExpression, timezone }),
+  })
+}
+
 async function getSchedules() {
   return request<Schedule[]>("/api/schedules")
 }
@@ -285,6 +292,7 @@ export {
   connectGitHub,
   createSchedule,
   createTrigger,
+  previewSchedule,
   deleteSchedule,
   deleteTrigger,
   getGitHubAvailableEvents,

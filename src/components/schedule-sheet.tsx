@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { TogglePill } from "@/components/ui/toggle-pill"
 import { cn } from "@/lib/utils"
-import { createSchedule, updateSchedule, type Schedule } from "@/lib/relay-api"
-
-const CRON_PRESETS: { label: string; value: string }[] = [
-  { label: "Every hour", value: "0 * * * *" },
-  { label: "Daily at 9 AM", value: "0 9 * * *" },
-  { label: "Weekdays at 9 AM", value: "0 9 * * 1-5" },
-  { label: "Weekly on Monday", value: "0 9 * * 1" },
-  { label: "Monthly on the 1st", value: "0 9 1 * *" },
-]
+import { createSchedule, previewSchedule, updateSchedule, type Schedule } from "@/lib/relay-api"
+import {
+  buildCronExpression,
+  DAY_LABELS,
+  describeCron,
+  FREQUENCY_LABELS,
+  pad2,
+  parseCronToFields,
+  type Frequency,
+} from "@/lib/schedule-utils"
 
 const COMMON_TIMEZONES = [
   "UTC",
@@ -38,6 +39,22 @@ function getBrowserTimezone(): string {
   }
 }
 
+function formatPreviewDate(iso: string, tz: string): string {
+  try {
+    const date = new Date(iso)
+    return date.toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: tz,
+    })
+  } catch {
+    return iso
+  }
+}
+
 function ScheduleSheet({
   open,
   onOpenChange,
@@ -52,13 +69,25 @@ function ScheduleSheet({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [prompt, setPrompt] = useState("")
-  const [cronExpression, setCronExpression] = useState("0 9 * * *")
+
+  const [frequency, setFrequency] = useState<Frequency>("daily")
+  const [hour, setHour] = useState(9)
+  const [minute, setMinute] = useState(0)
+  const [dayOfWeek, setDayOfWeek] = useState(1)
+  const [dayOfMonth, setDayOfMonth] = useState(1)
+
+  const [useAdvanced, setUseAdvanced] = useState(false)
   const [customCron, setCustomCron] = useState("")
-  const [useCustom, setUseCustom] = useState(false)
+
   const [timezone, setTimezone] = useState(getBrowserTimezone())
   const [enabled, setEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cronError, setCronError] = useState<string | null>(null)
+  const [nextRuns, setNextRuns] = useState<string[]>([])
+
+  const effectiveCron = useAdvanced
+    ? customCron.trim()
+    : buildCronExpression(frequency, hour, minute, dayOfWeek, dayOfMonth)
 
   useEffect(() => {
     if (editingSchedule) {
@@ -68,42 +97,61 @@ function ScheduleSheet({
       setTimezone(editingSchedule.timezone)
       setEnabled(editingSchedule.enabled)
 
-      const isPreset = CRON_PRESETS.some((p) => p.value === editingSchedule.cronExpression)
-      if (isPreset) {
-        setCronExpression(editingSchedule.cronExpression)
+      const parsed = parseCronToFields(editingSchedule.cronExpression)
+      if (parsed) {
+        setFrequency(parsed.frequency)
+        setHour(parsed.hour)
+        setMinute(parsed.minute)
+        setDayOfWeek(parsed.dayOfWeek)
+        setDayOfMonth(parsed.dayOfMonth)
+        setUseAdvanced(false)
         setCustomCron("")
-        setUseCustom(false)
       } else {
-        setCronExpression("")
+        setUseAdvanced(true)
         setCustomCron(editingSchedule.cronExpression)
-        setUseCustom(true)
       }
     } else {
       setName("")
       setDescription("")
       setPrompt("")
-      setCronExpression("0 9 * * *")
+      setFrequency("daily")
+      setHour(9)
+      setMinute(0)
+      setDayOfWeek(1)
+      setDayOfMonth(1)
+      setUseAdvanced(false)
       setCustomCron("")
-      setUseCustom(false)
       setTimezone(getBrowserTimezone())
       setEnabled(true)
     }
     setCronError(null)
+    setNextRuns([])
   }, [editingSchedule, open])
 
-  const effectiveCron = useCustom ? customCron.trim() : cronExpression
+  const fetchPreview = useCallback((cron: string, tz: string) => {
+    if (!cron) {
+      setNextRuns([])
+      return
+    }
+    previewSchedule(cron, tz)
+      .then((data) => setNextRuns(data.runs))
+      .catch(() => setNextRuns([]))
+  }, [])
 
-  function validateCron(expr: string): boolean {
-    const parts = expr.trim().split(/\s+/)
-    return parts.length === 5
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => fetchPreview(effectiveCron, timezone), 300)
+    return () => clearTimeout(timer)
+  }, [effectiveCron, timezone, fetchPreview])
 
   async function handleSubmit() {
     if (!name.trim() || !prompt.trim() || !effectiveCron) return
 
-    if (!validateCron(effectiveCron)) {
-      setCronError("Cron expression must have exactly 5 fields (minute hour day month weekday)")
-      return
+    if (useAdvanced) {
+      const parts = effectiveCron.split(/\s+/)
+      if (parts.length !== 5) {
+        setCronError("Cron expression must have exactly 5 fields (minute hour day month weekday)")
+        return
+      }
     }
 
     setSaving(true)
@@ -141,6 +189,9 @@ function ScheduleSheet({
   }
 
   const timezoneOptions = COMMON_TIMEZONES.includes(timezone) ? COMMON_TIMEZONES : [timezone, ...COMMON_TIMEZONES]
+  const showTime = !useAdvanced && frequency !== "hourly"
+  const showDayOfWeek = !useAdvanced && frequency === "weekly"
+  const showDayOfMonth = !useAdvanced && frequency === "monthly"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -183,46 +234,98 @@ function ScheduleSheet({
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label className="text-[12px] font-medium text-white/60">Schedule</label>
-            <div className="flex flex-wrap gap-1.5">
-              {CRON_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => {
-                    setCronExpression(preset.value)
-                    setUseCustom(false)
-                    setCronError(null)
-                  }}
-                  className={cn(
-                    "rounded-md border px-2.5 py-1 text-[11px] transition-colors",
-                    !useCustom && cronExpression === preset.value
-                      ? "border-violet-300/40 bg-violet-300/15 text-violet-200"
-                      : "border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.06] hover:text-white/70",
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setUseCustom(true)
-                  setCronExpression("")
-                  setCronError(null)
-                }}
-                className={cn(
-                  "rounded-md border px-2.5 py-1 text-[11px] transition-colors",
-                  useCustom
-                    ? "border-violet-300/40 bg-violet-300/15 text-violet-200"
-                    : "border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.06] hover:text-white/70",
+
+            {!useAdvanced ? (
+              <div className="space-y-2.5">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-white/35">Frequency</label>
+                  <select
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.currentTarget.value as Frequency)}
+                    className="flex h-7 w-full rounded-md border border-white/10 bg-white/[0.03] px-2.5 text-[13px] text-white/70"
+                  >
+                    {(Object.entries(FREQUENCY_LABELS) as [Frequency, string][]).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {showTime && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-white/35">At</label>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={hour}
+                        onChange={(e) => setHour(Number(e.currentTarget.value))}
+                        className="flex h-7 w-20 rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>
+                            {pad2(i)}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[13px] text-white/30">:</span>
+                      <select
+                        value={minute}
+                        onChange={(e) => setMinute(Number(e.currentTarget.value))}
+                        className="flex h-7 w-20 rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
+                      >
+                        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                          <option key={m} value={m}>
+                            {pad2(m)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 )}
-              >
-                Custom
-              </button>
-            </div>
-            {useCustom && (
+
+                {showDayOfWeek && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-white/35">On</label>
+                    <div className="flex gap-1">
+                      {DAY_LABELS.map((label, i) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setDayOfWeek(i)}
+                          className={cn(
+                            "flex h-7 w-9 items-center justify-center rounded-md border text-[11px] transition-colors",
+                            dayOfWeek === i
+                              ? "border-violet-300/40 bg-violet-300/15 text-violet-200"
+                              : "border-white/10 bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60",
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {showDayOfMonth && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-white/35">Day of month</label>
+                    <select
+                      value={dayOfMonth}
+                      onChange={(e) => setDayOfMonth(Number(e.currentTarget.value))}
+                      className="flex h-7 w-20 rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            ) : (
               <div className="space-y-1.5">
                 <Input
                   value={customCron}
@@ -238,7 +341,46 @@ function ScheduleSheet({
                 </p>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!useAdvanced) {
+                  setCustomCron(effectiveCron)
+                } else {
+                  const parsed = parseCronToFields(customCron.trim())
+                  if (parsed) {
+                    setFrequency(parsed.frequency)
+                    setHour(parsed.hour)
+                    setMinute(parsed.minute)
+                    setDayOfWeek(parsed.dayOfWeek)
+                    setDayOfMonth(parsed.dayOfMonth)
+                  }
+                }
+                setUseAdvanced(!useAdvanced)
+                setCronError(null)
+              }}
+              className="text-[11px] text-white/30 transition-colors hover:text-white/55"
+            >
+              {useAdvanced ? "Use simple editor" : "Use custom cron expression"}
+            </button>
+
             {cronError && <p className="text-[11px] text-rose-300/80">{cronError}</p>}
+
+            {effectiveCron && !cronError && (
+              <div className="rounded-md border border-white/6 bg-white/[0.02] px-3 py-2">
+                <p className="text-[11px] font-medium text-white/45">{describeCron(effectiveCron)}</p>
+                {nextRuns.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {nextRuns.map((run, i) => (
+                      <p key={i} className="text-[11px] text-white/25">
+                        {i === 0 ? "Next:" : ""} {formatPreviewDate(run, timezone)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

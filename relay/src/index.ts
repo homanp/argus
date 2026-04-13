@@ -1190,6 +1190,39 @@ app.get("/api/triggers/:triggerId/executions", async (request, response) => {
   })
 })
 
+// --- Schedules preview ---
+
+app.post("/api/schedules/preview", express.json(), (request, response) => {
+  const { cronExpression, timezone } = request.body ?? {}
+
+  if (!cronExpression || typeof cronExpression !== "string") {
+    response.status(400).json({ error: "Cron expression is required." })
+    return
+  }
+  if (!isValidCron(cronExpression)) {
+    response.status(400).json({ error: `Invalid cron expression: ${cronExpression}` })
+    return
+  }
+
+  const tz = typeof timezone === "string" && timezone.trim() ? timezone.trim() : "UTC"
+  const runs: string[] = []
+
+  try {
+    let cursor = new Date()
+    for (let i = 0; i < 3; i++) {
+      const next = computeNextRunAt(cronExpression, tz, cursor)
+      if (!next) break
+      runs.push(next)
+      cursor = new Date(new Date(next).getTime() + 1000)
+    }
+  } catch {
+    response.status(400).json({ error: "Failed to compute next runs." })
+    return
+  }
+
+  response.json({ runs })
+})
+
 // --- Schedules CRUD ---
 
 app.get("/api/schedules", async (_request, response) => {
