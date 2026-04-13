@@ -23,6 +23,7 @@ import App from "@/App"
 import { AppSidebar } from "@/components/app-sidebar"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
@@ -116,6 +117,10 @@ function RootLayout() {
                       <>
                         <span className="text-white/20">/</span>
                         <p className="truncate font-medium text-white">{providerTitle}</p>
+                        <span
+                          id="connector-status-badge"
+                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                        />
                       </>
                     ) : null}
                   </>
@@ -130,7 +135,13 @@ function RootLayout() {
                     {isTriggersDetail ? (
                       <>
                         <span className="text-white/20">/</span>
-                        <p className="truncate font-medium text-white">Detail</p>
+                        <p id="trigger-detail-name" className="truncate font-medium text-white">
+                          Detail
+                        </p>
+                        <span
+                          id="trigger-detail-status"
+                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                        />
                       </>
                     ) : null}
                   </>
@@ -144,7 +155,7 @@ function RootLayout() {
             </div>
 
             <div className="hidden items-center gap-1 md:flex">
-              {isConnectorsRoute && (
+              {pathname === "/connectors" && (
                 <div className="relative">
                   <HugeIcon
                     icon={Search01Icon}
@@ -181,6 +192,33 @@ function RootLayout() {
                     New trigger
                   </Button>
                 </>
+              )}
+              {providerTitle && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-connector"))}
+                  className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                >
+                  Delete
+                </Button>
+              )}
+              {isTriggersDetail && (
+                <ButtonGroup>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:edit-trigger"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-trigger"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                  >
+                    Delete
+                  </Button>
+                </ButtonGroup>
               )}
               {pathname === "/" && (
                 <>

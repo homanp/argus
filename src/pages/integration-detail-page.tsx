@@ -31,16 +31,14 @@ function buildEmptyGitHubState(): GitHubIntegrationState {
   }
 }
 
-function statusClasses(status: string) {
+function statusBadgeClasses(status: string) {
   switch (status) {
     case "connected":
-      return "border-emerald-300/30 bg-emerald-300/10 text-emerald-100"
+      return "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
     case "error":
-      return "border-rose-300/30 bg-rose-300/10 text-rose-100"
-    case "offline":
-      return "border-amber-300/30 bg-amber-300/10 text-amber-100"
+      return "border-rose-300/20 bg-rose-300/10 text-rose-200"
     default:
-      return "border-white/10 bg-white/[0.04] text-white/60"
+      return "border-white/10 bg-white/[0.04] text-white/40"
   }
 }
 
@@ -57,6 +55,10 @@ function webhookStatusBadge(status: string) {
   }
 }
 
+function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
 function CopyIconButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
@@ -64,17 +66,13 @@ function CopyIconButton({ value }: { value: string }) {
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(value)
     setCopied(true)
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-    }
+    if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => setCopied(false), 2000)
   }, [value])
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-      }
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [])
 
@@ -112,67 +110,67 @@ function ExpandableRepoRow({
 }) {
   return (
     <div className={`transition-colors ${repository.selected ? "bg-violet-300/[0.04]" : ""}`}>
-      <div className="flex items-center gap-3 px-3 py-2">
+      <div className="flex items-center gap-3 px-4 py-2.5">
         <input
           type="checkbox"
           checked={repository.selected}
           disabled={busy}
           onChange={(event) => onToggleSelect(event.currentTarget.checked)}
-          className="size-4 shrink-0 rounded border-white/15 bg-transparent accent-violet-300"
+          className="size-3.5 shrink-0 rounded border-white/15 bg-transparent accent-violet-300"
         />
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium text-white">{repository.fullName}</p>
-            <p className="text-[12px] text-white/40">
+            <p className="truncate text-[13px] font-medium text-white/80">{repository.fullName}</p>
+            <p className="text-[11px] text-white/35">
               {repository.private ? "Private" : "Public"} · {repository.defaultBranch ?? "main"}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {repository.selected ? (
+            {repository.selected && (
               <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] tracking-[0.02em] ${webhookStatusBadge(repository.webhookStatus)}`}
+                className={`rounded-full border px-1.5 py-px text-[10px] ${webhookStatusBadge(repository.webhookStatus)}`}
               >
-                {repository.webhookStatus.replaceAll("_", " ")}
+                {capitalize(repository.webhookStatus.replaceAll("_", " "))}
               </span>
-            ) : null}
-            <HugeIcon icon={expanded ? ArrowUp01Icon : ArrowDown01Icon} size={14} className="shrink-0 text-white/30" />
+            )}
+            <HugeIcon icon={expanded ? ArrowUp01Icon : ArrowDown01Icon} size={14} className="shrink-0 text-white/25" />
           </div>
         </button>
       </div>
 
-      {expanded ? (
-        <div className="space-y-3 border-t border-white/5 px-3 py-3 pl-10">
+      {expanded && (
+        <div className="space-y-3 border-t border-white/5 px-4 py-3 pl-11">
           {repository.selected && repository.webhookUrl ? (
             <>
               {repository.webhookManaged ? (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/5 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/5 px-3 py-2">
                   <HugeIcon icon={Tick02Icon} size={14} className="shrink-0 text-emerald-400" />
-                  <p className="text-[13px] text-emerald-200/80">
+                  <p className="text-[12px] text-emerald-200/80">
                     Webhook auto-managed by Argus. URL updates automatically when the relay restarts.
                   </p>
                 </div>
               ) : (
-                <p className="text-[13px] text-white/50">
+                <p className="text-[12px] text-white/45">
                   Add this webhook in your GitHub repo settings. Use{" "}
-                  <span className="text-white/70">application/json</span> as the content type. Grant{" "}
-                  <code className="rounded bg-white/6 px-1 text-[11px] text-white/70">admin:repo_hook</code> scope on
+                  <span className="text-white/65">application/json</span> as the content type. Grant{" "}
+                  <code className="rounded bg-white/6 px-1 text-[10px] text-white/65">admin:repo_hook</code> scope on
                   your token to let Argus manage this automatically.
                 </p>
               )}
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-white/35">Payload URL</p>
-                    <p className="truncate font-mono text-[11px] text-white/80">{repository.webhookUrl}</p>
+                    <p className="text-[10px] uppercase tracking-[0.08em] text-white/30">Payload URL</p>
+                    <p className="truncate font-mono text-[11px] text-white/70">{repository.webhookUrl}</p>
                   </div>
                   <CopyIconButton value={repository.webhookUrl!} />
                 </div>
                 {!repository.webhookManaged && (
-                  <div className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-[0.08em] text-white/35">Secret</p>
-                      <p className="truncate font-mono text-[11px] text-white/80">{repository.webhookSecret}</p>
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-white/30">Secret</p>
+                      <p className="truncate font-mono text-[11px] text-white/70">{repository.webhookSecret}</p>
                     </div>
                     <CopyIconButton value={repository.webhookSecret!} />
                   </div>
@@ -188,21 +186,21 @@ function ExpandableRepoRow({
                 >
                   {busy ? "Testing..." : "Test webhook"}
                 </Button>
-                {testSuccess ? (
+                {testSuccess && (
                   <span className="flex items-center gap-1 text-[12px] text-emerald-400">
                     <HugeIcon icon={Tick02Icon} size={14} />
                     Success
                   </span>
-                ) : null}
+                )}
               </div>
             </>
           ) : repository.selected ? (
-            <p className="text-[13px] text-white/45">Generating webhook credentials...</p>
+            <p className="text-[12px] text-white/40">Generating webhook credentials...</p>
           ) : (
-            <p className="text-[13px] text-white/45">Enable this repo to generate its webhook URL and secret.</p>
+            <p className="text-[12px] text-white/40">Enable this repo to generate its webhook URL and secret.</p>
           )}
         </div>
-      ) : null}
+      )}
     </div>
   )
 }
@@ -226,6 +224,14 @@ function IntegrationDetailPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  function syncNavbarBadge(status: string) {
+    const badge = document.getElementById("connector-status-badge")
+    if (!badge) return
+    const label = capitalize(status.replaceAll("_", " "))
+    badge.textContent = label
+    badge.className = `ml-1 rounded-full border px-1.5 py-0.5 text-[10px] ${statusBadgeClasses(status)}`
+  }
+
   useEffect(() => {
     if (provider !== "github") {
       setLoading(false)
@@ -239,6 +245,7 @@ function IntegrationDetailPage() {
         const state = await getGitHubIntegration()
         if (!cancelled) {
           setGithubState(state)
+          syncNavbarBadge(state.status)
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -246,9 +253,7 @@ function IntegrationDetailPage() {
           setError(loadError instanceof Error ? loadError.message : "Failed to reach the local relay.")
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -256,6 +261,8 @@ function IntegrationDetailPage() {
 
     return () => {
       cancelled = true
+      const badge = document.getElementById("connector-status-badge")
+      if (badge) badge.className = "ml-1 hidden"
     }
   }, [provider])
 
@@ -272,6 +279,7 @@ function IntegrationDetailPage() {
     try {
       const state = await connectGitHub(apiKey.trim())
       setGithubState(state)
+      syncNavbarBadge(state.status)
       setNotice("GitHub connected. Select the repos you want to configure webhooks for.")
       setApiKey("")
     } catch (connectError) {
@@ -304,9 +312,7 @@ function IntegrationDetailPage() {
     try {
       const nextState = await setGitHubRepositorySelected(repositoryId, enabled)
       setGithubState(nextState)
-      if (enabled) {
-        setExpandedRepoIds((current) => new Set([...current, repositoryId]))
-      }
+      if (enabled) setExpandedRepoIds((current) => new Set([...current, repositoryId]))
     } catch (toggleError) {
       setError(toggleError instanceof Error ? toggleError.message : "Failed to update repository selection.")
     } finally {
@@ -334,11 +340,8 @@ function IntegrationDetailPage() {
   function toggleExpanded(repositoryId: string) {
     setExpandedRepoIds((current) => {
       const next = new Set(current)
-      if (next.has(repositoryId)) {
-        next.delete(repositoryId)
-      } else {
-        next.add(repositoryId)
-      }
+      if (next.has(repositoryId)) next.delete(repositoryId)
+      else next.add(repositoryId)
       return next
     })
   }
@@ -346,10 +349,7 @@ function IntegrationDetailPage() {
   const filteredRepositories = useMemo(() => {
     const repos = githubState?.repositories ?? []
     const query = repoSearch.trim().toLowerCase()
-    if (!query) {
-      return repos
-    }
-
+    if (!query) return repos
     return repos.filter(
       (repo) =>
         repo.fullName.toLowerCase().includes(query) ||
@@ -362,80 +362,61 @@ function IntegrationDetailPage() {
 
   return (
     <section className="px-5 py-5 md:px-6">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-lg font-semibold text-white">{integration.title}</h1>
-            <p className="text-[13px] text-white/45">{integration.description}</p>
-          </div>
-          <span
-            className={`inline-flex shrink-0 rounded-full border px-2.5 py-1 text-[11px] tracking-[0.02em] ${
-              provider === "github"
-                ? statusClasses(githubState?.status ?? "offline")
-                : "border-white/10 bg-white/[0.04] text-white/55"
-            }`}
-          >
-            {provider === "github"
-              ? (githubState?.status?.replaceAll("_", " ") ?? "offline")
-              : integration.available
-                ? "available"
-                : "coming soon"}
-          </span>
-        </div>
-
-        {notice ? <p className="text-[13px] text-emerald-200/85">{notice}</p> : null}
-        {error ? <p className="text-[13px] text-rose-200/85">{error}</p> : null}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+        {notice && <p className="text-[13px] text-emerald-200/85">{notice}</p>}
+        {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
         {provider !== "github" ? (
-          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-[13px] text-white/45">
-            {integration.title} is not implemented yet. This page is reserved for its configuration flow once the relay
-            supports that provider.
+          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-[13px] text-white/40">
+            {integration.title} is not implemented yet.
           </div>
         ) : (
           <>
-            <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
-              <div className="space-y-1">
-                <h2 className="text-[13px] font-semibold text-white">API key</h2>
-                <p className="text-[13px] text-white/45">
+            <div className="overflow-hidden rounded-lg border border-white/8">
+              <div className="border-b border-white/6 px-4 py-3">
+                <p className="text-[13px] font-medium text-white/80">API key</p>
+                <p className="text-[12px] text-white/40">
                   Paste a GitHub personal access token to load repositories this relay can monitor.
                 </p>
               </div>
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.currentTarget.value)}
-                placeholder="ghp_..."
-              />
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleConnectGitHub}
-                  disabled={submittingApiKey}
-                  className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
-                >
-                  {submittingApiKey
-                    ? "Connecting..."
-                    : githubState?.apiKeyConfigured
-                      ? "Update API key"
-                      : "Connect GitHub"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSyncRepos}
-                  disabled={syncing || !githubState?.apiKeyConfigured}
-                  className="border-white/10 bg-transparent text-white/75 hover:bg-white/[0.04] hover:text-white"
-                >
-                  {syncing ? "Syncing..." : "Sync repos"}
-                </Button>
+              <div className="flex flex-col gap-3 px-4 py-3">
+                <Input
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.currentTarget.value)}
+                  placeholder="ghp_..."
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => void handleConnectGitHub()}
+                    disabled={submittingApiKey}
+                    className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
+                  >
+                    {submittingApiKey
+                      ? "Connecting..."
+                      : githubState?.apiKeyConfigured
+                        ? "Update API key"
+                        : "Connect GitHub"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleSyncRepos()}
+                    disabled={syncing || !githubState?.apiKeyConfigured}
+                    className="border-white/10 bg-transparent text-white/65 hover:bg-white/[0.04] hover:text-white"
+                  >
+                    {syncing ? "Syncing..." : "Sync repos"}
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {selectedCount > 0 ? (
-              <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
-                <div className="space-y-1">
-                  <h2 className="text-[13px] font-semibold text-white">Connected repositories</h2>
-                  <p className="text-[13px] text-white/45">Repositories with active webhook configurations.</p>
+            {selectedCount > 0 && (
+              <div className="overflow-hidden rounded-lg border border-white/8">
+                <div className="border-b border-white/6 px-4 py-3">
+                  <p className="text-[13px] font-medium text-white/80">Connected repositories</p>
+                  <p className="text-[12px] text-white/40">Repositories with active webhook configurations.</p>
                 </div>
-                <div className="divide-y divide-white/5 rounded-lg border border-white/8">
+                <div className="divide-y divide-white/5">
                   {githubState?.repositories
                     .filter((repository) => repository.selected)
                     .map((repository) => (
@@ -452,41 +433,38 @@ function IntegrationDetailPage() {
                     ))}
                 </div>
               </div>
-            ) : null}
+            )}
 
-            <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 className="text-[13px] font-semibold text-white">All repositories</h2>
-                  <p className="text-[13px] text-white/45">
-                    Select a repo to enable webhooks. Each selected repo gets its own webhook URL and secret you
-                    configure in GitHub.
-                  </p>
+            <div className="overflow-hidden rounded-lg border border-white/8">
+              <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
+                <div>
+                  <p className="text-[13px] font-medium text-white/80">All repositories</p>
+                  <p className="text-[12px] text-white/40">Select a repo to enable webhooks.</p>
                 </div>
-                {selectedCount > 0 ? (
-                  <span className="shrink-0 rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-0.5 text-[11px] text-violet-200">
-                    {selectedCount} active
+                {selectedCount > 0 && (
+                  <span className="shrink-0 rounded-full border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+                    {selectedCount} Active
                   </span>
-                ) : null}
+                )}
               </div>
-
-              <div className="relative">
-                <HugeIcon
-                  icon={Search01Icon}
-                  size={14}
-                  className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-white/35"
-                />
-                <Input
-                  value={repoSearch}
-                  onChange={(event) => setRepoSearch(event.currentTarget.value)}
-                  placeholder="Search repositories..."
-                  className="pl-8 text-[12px]"
-                />
+              <div className="border-b border-white/5 px-4 py-2.5">
+                <div className="relative">
+                  <HugeIcon
+                    icon={Search01Icon}
+                    size={14}
+                    className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-white/30"
+                  />
+                  <Input
+                    value={repoSearch}
+                    onChange={(event) => setRepoSearch(event.currentTarget.value)}
+                    placeholder="Search repositories..."
+                    className="pl-8 text-[12px]"
+                  />
+                </div>
               </div>
-
-              <div className="max-h-[600px] divide-y divide-white/5 overflow-y-auto rounded-lg border border-white/8">
+              <div className="max-h-[500px] divide-y divide-white/5 overflow-y-auto">
                 {loading ? (
-                  <div className="py-6 text-center text-[13px] text-white/45">Loading repositories...</div>
+                  <div className="py-6 text-center text-[13px] text-white/40">Loading repositories...</div>
                 ) : filteredRepositories.length ? (
                   filteredRepositories.map((repository) => (
                     <ExpandableRepoRow
@@ -501,9 +479,9 @@ function IntegrationDetailPage() {
                     />
                   ))
                 ) : githubState?.repositories.length ? (
-                  <div className="py-6 text-center text-[13px] text-white/45">No repositories match your search.</div>
+                  <div className="py-6 text-center text-[13px] text-white/40">No repositories match your search.</div>
                 ) : (
-                  <div className="py-6 text-center text-[13px] text-white/45">
+                  <div className="py-6 text-center text-[13px] text-white/40">
                     Connect GitHub to load repositories into this list.
                   </div>
                 )}

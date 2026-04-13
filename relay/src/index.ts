@@ -4,7 +4,7 @@ import path from "node:path"
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
-import { and, count, desc, eq, inArray } from "drizzle-orm"
+import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
 import { createDatabase } from "./db/client.js"
 import { githubRepositories, githubWebhookEvents, integrations, triggerExecutions, triggers } from "./db/schema.js"
@@ -197,7 +197,7 @@ async function createGitHubWebhook(
       body: JSON.stringify({
         name: "web",
         active: true,
-        events: ["*"],
+        events: GITHUB_STATIC_EVENTS,
         config: {
           url: webhookUrl,
           content_type: "json",
@@ -650,31 +650,52 @@ type TriggerCondition = {
   value: string
 }
 
-function resolveField(object: Record<string, unknown>, path: string): unknown {
-  let current: unknown = object
+function resolveField(object: Record<string, unknown>, path: string): unknown[] {
+  let current: unknown[] = [object]
+
   for (const segment of path.split(".")) {
-    if (current == null || typeof current !== "object") return undefined
-    current = (current as Record<string, unknown>)[segment]
+    const next: unknown[] = []
+    for (const node of current) {
+      if (node == null || typeof node !== "object") continue
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          if (item != null && typeof item === "object") {
+            const val = (item as Record<string, unknown>)[segment]
+            if (val !== undefined) next.push(val)
+          }
+        }
+      } else {
+        const val = (node as Record<string, unknown>)[segment]
+        if (val !== undefined) next.push(val)
+      }
+    }
+    current = next
   }
+
   return current
+}
+
+function matchesCondition(values: unknown[], operator: TriggerCondition["operator"], expected: string): boolean {
+  if (values.length === 0) {
+    return operator === "not_equals"
+  }
+
+  const strings = values.map((v) => (v == null ? "" : String(v)))
+
+  switch (operator) {
+    case "equals":
+      return strings.some((s) => s === expected)
+    case "not_equals":
+      return strings.every((s) => s !== expected)
+    case "contains":
+      return strings.some((s) => s.includes(expected))
+  }
 }
 
 function evaluateConditions(payload: Record<string, unknown>, conditions: TriggerCondition[]): boolean {
   for (const condition of conditions) {
-    const actual = resolveField(payload, condition.field)
-    const actualStr = actual == null ? "" : String(actual)
-
-    switch (condition.operator) {
-      case "equals":
-        if (actualStr !== condition.value) return false
-        break
-      case "not_equals":
-        if (actualStr === condition.value) return false
-        break
-      case "contains":
-        if (!actualStr.includes(condition.value)) return false
-        break
-    }
+    const values = resolveField(payload, condition.field)
+    if (!matchesCondition(values, condition.operator, condition.value)) return false
   }
   return true
 }
@@ -851,7 +872,11 @@ app.get("/api/integrations/github/available-events", async (_request, response) 
         const hooks = await githubRequest<GitHubHook[]>(integration.apiKey, `/repos/${repo.owner}/${repo.name}/hooks`)
         for (const hook of hooks) {
           for (const event of hook.events) {
-            allEvents.add(event)
+            if (event === "*") {
+              for (const e of GITHUB_STATIC_EVENTS) allEvents.add(e)
+            } else {
+              allEvents.add(event)
+            }
           }
         }
       } catch {
@@ -971,18 +996,10 @@ app.get("/api/triggers", async (_request, response) => {
   const countMap = new Map(executionCounts.map((row) => [row.triggerId, row.count]))
 
   const lastExecutions = await db
-    .select({
-      triggerId: triggerExecutions.triggerId,
-      matchedAt: triggerExecutions.matchedAt,
-    })
+    .select({ triggerId: triggerExecutions.triggerId, lastMatchedAt: max(triggerExecutions.matchedAt) })
     .from(triggerExecutions)
-    .orderBy(desc(triggerExecutions.matchedAt))
-  const lastFiredMap = new Map<string, string>()
-  for (const row of lastExecutions) {
-    if (!lastFiredMap.has(row.triggerId)) {
-      lastFiredMap.set(row.triggerId, row.matchedAt)
-    }
-  }
+    .groupBy(triggerExecutions.triggerId)
+  const lastFiredMap = new Map(lastExecutions.map((row) => [row.triggerId, row.lastMatchedAt]))
 
   response.json(
     allTriggers.map((trigger) => ({

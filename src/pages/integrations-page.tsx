@@ -3,8 +3,6 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { useNavigate } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import { getGitHubIntegration, RELAY_BASE_URL, type GitHubIntegrationState } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
@@ -23,40 +21,6 @@ function buildEmptyGitHubState(): GitHubIntegrationState {
   }
 }
 
-function statusLabel(state: GitHubIntegrationState | null) {
-  if (!state) {
-    return "offline"
-  }
-
-  if (state.status === "connected") {
-    return "connected"
-  }
-
-  if (state.status === "error") {
-    return "error"
-  }
-
-  return "not connected"
-}
-
-function TogglePill({ active }: { active: boolean }) {
-  return (
-    <div
-      className={cn(
-        "relative flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors",
-        active ? "border-violet-300/40 bg-violet-300/90" : "border-white/10 bg-white/[0.08]",
-      )}
-    >
-      <div
-        className={cn(
-          "size-3.5 rounded-full bg-white transition-transform",
-          active ? "translate-x-3.5" : "translate-x-0",
-        )}
-      />
-    </div>
-  )
-}
-
 function IntegrationsPage() {
   const navigate = useNavigate()
   const [githubState, setGithubState] = useState<GitHubIntegrationState | null>(null)
@@ -68,75 +32,80 @@ function IntegrationsPage() {
     async function load() {
       try {
         const state = await getGitHubIntegration()
-        if (!cancelled) {
-          setGithubState(state)
-        }
+        if (!cancelled) setGithubState(state)
       } catch (loadError) {
         if (!cancelled) {
           setGithubState(buildEmptyGitHubState())
           setError(loadError instanceof Error ? loadError.message : "Failed to reach the local relay.")
         }
-      } finally {
-        if (!cancelled) {
-          // no-op, load completion only clears error fallback
-        }
       }
     }
 
     void load()
-
     return () => {
       cancelled = true
     }
   }, [])
 
-  const githubCardStatus = statusLabel(githubState)
+  function resolveStatus(provider: string) {
+    if (provider !== "github") return null
+    if (!githubState) return null
+    if (githubState.status === "connected") return "connected" as const
+    if (githubState.status === "error") return "error" as const
+    return null
+  }
 
   return (
     <section className="px-5 py-5 md:px-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        {error ? <p className="text-[13px] text-rose-200/85">{error}</p> : null}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+        {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {integrationCatalog.map((integration) => {
-            const isGitHub = integration.provider === "github"
-            const connected = isGitHub ? githubCardStatus === "connected" : false
+        <div className="overflow-hidden rounded-lg border border-white/8">
+          {integrationCatalog.map((integration, index) => {
+            const status = resolveStatus(integration.provider)
+            const isLast = index === integrationCatalog.length - 1
 
             return (
-              <Card
+              <button
                 key={integration.provider}
-                className="border border-white/8 bg-white/[0.025] text-white shadow-none transition-colors"
+                type="button"
+                onClick={() => navigate({ to: "/connectors/$provider", params: { provider: integration.provider } })}
+                className={cn(
+                  "flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.03]",
+                  !isLast && "border-b border-white/6",
+                  !integration.available && "opacity-50",
+                )}
               >
-                <CardHeader className="gap-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <CardTitle className="text-white">{integration.title}</CardTitle>
-                      <CardDescription className="text-white/45">{integration.domain}</CardDescription>
-                    </div>
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/80 ring-1 ring-white/10">
-                      {integration.image ? (
-                        <img src={integration.image} alt={integration.title} className="size-6" />
-                      ) : (
-                        <HugeIcon icon={integration.icon} size={22} />
-                      )}
-                    </div>
-                  </div>
-                  <p className="min-h-12 text-[13px] leading-6 text-white/65">{integration.description}</p>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      navigate({ to: "/connectors/$provider", params: { provider: integration.provider } })
-                    }
-                    className="border-white/10 bg-transparent text-white/75 hover:bg-white/[0.04] hover:text-white"
-                  >
-                    View integration
-                    <HugeIcon icon={ArrowRight01Icon} size={14} className="text-white/45" />
-                  </Button>
-                  <TogglePill active={connected} />
-                </CardContent>
-              </Card>
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] ring-1 ring-white/8">
+                  {integration.image ? (
+                    <img src={integration.image} alt={integration.title} className="size-5" />
+                  ) : (
+                    <HugeIcon icon={integration.icon} size={18} className="text-white/70" />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-white/85">{integration.title}</p>
+                  <p className="truncate text-[12px] text-white/40">{integration.description}</p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  {status === "connected" ? (
+                    <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[11px] text-emerald-200">
+                      Connected
+                    </span>
+                  ) : status === "error" ? (
+                    <span className="rounded-full border border-rose-300/20 bg-rose-300/10 px-2 py-0.5 text-[11px] text-rose-200">
+                      Error
+                    </span>
+                  ) : integration.available ? (
+                    <span className="text-[12px] text-white/40">Connect</span>
+                  ) : (
+                    <span className="text-[11px] text-white/25">Coming soon</span>
+                  )}
+                  <HugeIcon icon={ArrowRight01Icon} size={14} className="text-white/20" />
+                </div>
+              </button>
             )
           })}
         </div>
