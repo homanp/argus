@@ -93,6 +93,44 @@ type AvailableEventsResponse = {
   source: "github_api" | "static_fallback"
 }
 
+type Schedule = {
+  id: string
+  name: string
+  description: string | null
+  prompt: string
+  cronExpression: string
+  timezone: string
+  enabled: boolean
+  nextRunAt: string | null
+  lastRunAt: string | null
+  executionCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+type ScheduleExecution = {
+  id: number
+  status: string
+  startedAt: string
+  finishedAt: string | null
+  resultMessage: string | null
+}
+
+type ScheduleDetailResponse = {
+  schedule: {
+    id: string
+    name: string
+    description: string | null
+    prompt: string
+    cronExpression: string
+    timezone: string
+    enabled: boolean
+    nextRunAt: string | null
+    lastRunAt: string | null
+  }
+  executions: ScheduleExecution[]
+}
+
 const RELAY_BASE_URL = "http://127.0.0.1:8787"
 
 async function request<T>(path: string, init?: RequestInit) {
@@ -197,25 +235,78 @@ async function getTriggerExecutions(triggerId: string) {
   return request<TriggerDetailResponse>(`/api/triggers/${triggerId}/executions`)
 }
 
+async function getSchedules() {
+  return request<Schedule[]>("/api/schedules")
+}
+
+async function createSchedule(data: {
+  name: string
+  description?: string
+  prompt: string
+  cronExpression: string
+  timezone?: string
+  enabled?: boolean
+}) {
+  return request<Schedule>("/api/schedules", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+async function updateSchedule(
+  scheduleId: string,
+  data: Partial<{
+    name: string
+    description: string
+    prompt: string
+    cronExpression: string
+    timezone: string
+    enabled: boolean
+  }>,
+) {
+  return request<Schedule>(`/api/schedules/${scheduleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
+async function deleteSchedule(scheduleId: string) {
+  return request<{ ok: true }>(`/api/schedules/${scheduleId}`, {
+    method: "DELETE",
+  })
+}
+
+async function getScheduleExecutions(scheduleId: string) {
+  return request<ScheduleDetailResponse>(`/api/schedules/${scheduleId}/executions`)
+}
+
 export {
   RELAY_BASE_URL,
   connectGitHub,
+  createSchedule,
   createTrigger,
+  deleteSchedule,
   deleteTrigger,
   getGitHubAvailableEvents,
   getGitHubIntegration,
+  getScheduleExecutions,
+  getSchedules,
   getTriggerExecutions,
   getTriggers,
   prepareGitHubRepositoryWebhook,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
+  updateSchedule,
   updateTrigger,
 }
 export type {
   AvailableEventsResponse,
   GitHubIntegrationRepository,
   GitHubIntegrationState,
+  Schedule,
+  ScheduleDetailResponse,
+  ScheduleExecution,
   Trigger,
   TriggerCondition,
   TriggerDetailResponse,

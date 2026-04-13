@@ -12,6 +12,7 @@ import {
   ActivitySparkIcon,
   Add01Icon,
   ArrowLeft02Icon,
+  Calendar03Icon,
   ConnectIcon,
   Search01Icon,
   ZapIcon,
@@ -30,6 +31,8 @@ import { missionsHeader } from "@/lib/app-shell-data"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
 import IntegrationsPage from "@/pages/integrations-page"
+import ScheduleDetailPage from "@/pages/schedule-detail-page"
+import SchedulesPage from "@/pages/schedules-page"
 import TriggerDetailPage from "@/pages/trigger-detail-page"
 import TriggersPage from "@/pages/triggers-page"
 
@@ -48,6 +51,11 @@ const routeHeaderMap = {
     subtitle: "Reactive rules for incoming webhook events",
     icon: ZapIcon,
   },
+  "/schedules": {
+    title: "Schedules",
+    subtitle: "Scheduled prompts that run on a cron cadence",
+    icon: Calendar03Icon,
+  },
 } as const
 
 function RootLayout() {
@@ -57,6 +65,8 @@ function RootLayout() {
   const isConnectorsRoute = pathname === "/connectors" || pathname.startsWith("/connectors/")
   const isTriggersRoute = pathname === "/triggers" || pathname.startsWith("/triggers/")
   const isTriggersDetail = pathname.startsWith("/triggers/") && pathname !== "/triggers"
+  const isSchedulesRoute = pathname === "/schedules" || pathname.startsWith("/schedules/")
+  const isSchedulesDetail = pathname.startsWith("/schedules/") && pathname !== "/schedules"
   const header = pathname.startsWith("/connectors/")
     ? {
         title: "Connector detail",
@@ -69,7 +79,13 @@ function RootLayout() {
           subtitle: "Configuration and execution history",
           icon: ZapIcon,
         }
-      : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
+      : isSchedulesDetail
+        ? {
+            title: "Schedule detail",
+            subtitle: "Configuration and execution history",
+            icon: Calendar03Icon,
+          }
+        : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
 
   const providerSlug = pathname.startsWith("/connectors/") ? pathname.split("/").filter(Boolean)[1] : null
   const providerTitle = providerSlug
@@ -94,9 +110,9 @@ function RootLayout() {
           <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
             <div className="flex min-w-0 items-center gap-2">
               <SidebarTrigger className="size-6 rounded-sm p-0 text-white/35 hover:bg-white/[0.03] hover:text-white/70 md:hidden" />
-              {providerTitle || isTriggersDetail ? (
+              {providerTitle || isTriggersDetail || isSchedulesDetail ? (
                 <Link
-                  to={isTriggersDetail ? "/triggers" : "/connectors"}
+                  to={isSchedulesDetail ? "/schedules" : isTriggersDetail ? "/triggers" : "/connectors"}
                   className="flex size-6 items-center justify-center rounded-md border border-white/10 text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/80"
                 >
                   <HugeIcon icon={ArrowLeft02Icon} size={14} />
@@ -140,6 +156,27 @@ function RootLayout() {
                         </p>
                         <span
                           id="trigger-detail-status"
+                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                        />
+                      </>
+                    ) : null}
+                  </>
+                ) : isSchedulesRoute ? (
+                  <>
+                    <Link
+                      to="/schedules"
+                      className={`font-medium transition-colors ${isSchedulesDetail ? "text-white/45 hover:text-white/70" : "text-white"}`}
+                    >
+                      Schedules
+                    </Link>
+                    {isSchedulesDetail ? (
+                      <>
+                        <span className="text-white/20">/</span>
+                        <p id="schedule-detail-name" className="truncate font-medium text-white">
+                          Detail
+                        </p>
+                        <span
+                          id="schedule-detail-status"
                           className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
                         />
                       </>
@@ -220,6 +257,51 @@ function RootLayout() {
                   </Button>
                 </ButtonGroup>
               )}
+              {pathname === "/schedules" && (
+                <>
+                  <div className="relative">
+                    <HugeIcon
+                      icon={Search01Icon}
+                      size={14}
+                      className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-white/35"
+                    />
+                    <Input
+                      placeholder="Search schedules..."
+                      className="h-7 w-52 rounded-md border-white/8 bg-white/[0.03] pl-8 !text-[12px] text-white/70 placeholder:text-white/30"
+                      onChange={(e) =>
+                        window.dispatchEvent(
+                          new CustomEvent("argus:schedule-search", { detail: e.currentTarget.value }),
+                        )
+                      }
+                    />
+                  </div>
+                  <Button
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:new-schedule"))}
+                    className="h-7 gap-1.5 rounded-md bg-violet-300 px-2.5 text-[11px] font-medium text-violet-950 hover:bg-violet-200"
+                  >
+                    <HugeIcon icon={Add01Icon} size={12} />
+                    New schedule
+                  </Button>
+                </>
+              )}
+              {isSchedulesDetail && (
+                <ButtonGroup>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:edit-schedule"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-schedule"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                  >
+                    Delete
+                  </Button>
+                </ButtonGroup>
+              )}
               {pathname === "/" && (
                 <>
                   <Button
@@ -282,12 +364,26 @@ const triggerDetailRoute = createRoute({
   component: TriggerDetailPage,
 })
 
+const schedulesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/schedules",
+  component: SchedulesPage,
+})
+
+const scheduleDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/schedules/$scheduleId",
+  component: ScheduleDetailPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   connectorsRoute,
   connectorDetailRoute,
   triggersRoute,
   triggerDetailRoute,
+  schedulesRoute,
+  scheduleDetailRoute,
 ])
 
 export const router = createRouter({

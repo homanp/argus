@@ -11,6 +11,7 @@
     "better-sqlite3": "^12.4.1",
     "cloudflared": "^0.7.1",
     "cors": "^2.8.5",
+    "cron-parser": "^5.5.0",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
     "express": "^5.1.0"

@@ -81,6 +81,29 @@ function createDatabase(databasePath: string) {
       webhook_event_id INTEGER NOT NULL,
       matched_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      prompt TEXT NOT NULL,
+      cron_expression TEXT NOT NULL,
+      timezone TEXT NOT NULL DEFAULT 'UTC',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      next_run_at TEXT,
+      last_run_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS schedule_executions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      schedule_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      result_message TEXT
+    );
   `)
 
   const repoColumns = sqlite.pragma("table_info(github_repositories)") as { name: string }[]
