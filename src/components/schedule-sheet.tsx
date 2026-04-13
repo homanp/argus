@@ -239,51 +239,53 @@ function ScheduleSheet({
 
             {!useAdvanced ? (
               <div className="space-y-2.5">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-white/35">Frequency</label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.currentTarget.value as Frequency)}
-                    className="flex h-7 w-full rounded-md border border-white/10 bg-white/[0.03] px-2.5 text-[13px] text-white/70"
-                  >
-                    {(Object.entries(FREQUENCY_LABELS) as [Frequency, string][]).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {showTime && (
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] text-white/35">At</label>
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        value={hour}
-                        onChange={(e) => setHour(Number(e.currentTarget.value))}
-                        className="flex h-7 w-20 rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
-                      >
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <option key={i} value={i}>
-                            {pad2(i)}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="text-[13px] text-white/30">:</span>
-                      <select
-                        value={minute}
-                        onChange={(e) => setMinute(Number(e.currentTarget.value))}
-                        className="flex h-7 w-20 rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
-                      >
-                        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
-                          <option key={m} value={m}>
-                            {pad2(m)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <label className="text-[11px] text-white/35">Frequency</label>
+                    <select
+                      value={frequency}
+                      onChange={(e) => setFrequency(e.currentTarget.value as Frequency)}
+                      className="flex h-7 w-full rounded-md border border-white/10 bg-white/[0.03] px-2.5 text-[13px] text-white/70"
+                    >
+                      {(Object.entries(FREQUENCY_LABELS) as [Frequency, string][]).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
+
+                  {showTime && (
+                    <div className="shrink-0 space-y-1">
+                      <label className="text-[11px] text-white/35">At</label>
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={hour}
+                          onChange={(e) => setHour(Number(e.currentTarget.value))}
+                          className="flex h-7 w-[4.25rem] rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
+                        >
+                          {Array.from({ length: 24 }, (_, i) => (
+                            <option key={i} value={i}>
+                              {pad2(i)}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-[13px] text-white/30">:</span>
+                        <select
+                          value={minute}
+                          onChange={(e) => setMinute(Number(e.currentTarget.value))}
+                          className="flex h-7 w-[4.25rem] rounded-md border border-white/10 bg-white/[0.03] px-2 text-[13px] tabular-nums text-white/70"
+                        >
+                          {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                            <option key={m} value={m}>
+                              {pad2(m)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {showDayOfWeek && (
                   <div className="space-y-1.5">
