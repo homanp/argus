@@ -122,7 +122,7 @@ function ExpandableRepoRow({
         />
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{repository.fullName}</p>
+            <p className="truncate text-[13px] font-medium text-white">{repository.fullName}</p>
             <p className="text-[12px] text-white/40">
               {repository.private ? "Private" : "Public"} · {repository.defaultBranch ?? "main"}
             </p>
@@ -144,10 +144,21 @@ function ExpandableRepoRow({
         <div className="space-y-3 border-t border-white/5 px-3 py-3 pl-10">
           {repository.selected && repository.webhookUrl ? (
             <>
-              <p className="text-[13px] text-white/50">
-                Add this webhook in your GitHub repo settings. Use{" "}
-                <span className="text-white/70">application/json</span> as the content type.
-              </p>
+              {repository.webhookManaged ? (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/5 px-3 py-2">
+                  <HugeIcon icon={Tick02Icon} size={14} className="shrink-0 text-emerald-400" />
+                  <p className="text-[13px] text-emerald-200/80">
+                    Webhook auto-managed by Argus. URL updates automatically when the relay restarts.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[13px] text-white/50">
+                  Add this webhook in your GitHub repo settings. Use{" "}
+                  <span className="text-white/70">application/json</span> as the content type. Grant{" "}
+                  <code className="rounded bg-white/6 px-1 text-[11px] text-white/70">admin:repo_hook</code> scope on
+                  your token to let Argus manage this automatically.
+                </p>
+              )}
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
@@ -157,13 +168,15 @@ function ExpandableRepoRow({
                   </div>
                   <CopyIconButton value={repository.webhookUrl!} />
                 </div>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-[0.08em] text-white/35">Secret</p>
-                    <p className="truncate font-mono text-[11px] text-white/80">{repository.webhookSecret}</p>
+                {!repository.webhookManaged && (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-white/35">Secret</p>
+                      <p className="truncate font-mono text-[11px] text-white/80">{repository.webhookSecret}</p>
+                    </div>
+                    <CopyIconButton value={repository.webhookSecret!} />
                   </div>
-                  <CopyIconButton value={repository.webhookSecret!} />
-                </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -353,7 +366,7 @@ function IntegrationDetailPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
             <h1 className="text-lg font-semibold text-white">{integration.title}</h1>
-            <p className="text-sm text-white/45">{integration.description}</p>
+            <p className="text-[13px] text-white/45">{integration.description}</p>
           </div>
           <span
             className={`inline-flex shrink-0 rounded-full border px-2.5 py-1 text-[11px] tracking-[0.02em] ${
@@ -370,11 +383,11 @@ function IntegrationDetailPage() {
           </span>
         </div>
 
-        {notice ? <p className="text-sm text-emerald-200/85">{notice}</p> : null}
-        {error ? <p className="text-sm text-rose-200/85">{error}</p> : null}
+        {notice ? <p className="text-[13px] text-emerald-200/85">{notice}</p> : null}
+        {error ? <p className="text-[13px] text-rose-200/85">{error}</p> : null}
 
         {provider !== "github" ? (
-          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-sm text-white/45">
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-[13px] text-white/45">
             {integration.title} is not implemented yet. This page is reserved for its configuration flow once the relay
             supports that provider.
           </div>
@@ -382,7 +395,7 @@ function IntegrationDetailPage() {
           <>
             <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold text-white">API key</h2>
+                <h2 className="text-[13px] font-semibold text-white">API key</h2>
                 <p className="text-[13px] text-white/45">
                   Paste a GitHub personal access token to load repositories this relay can monitor.
                 </p>
@@ -419,7 +432,7 @@ function IntegrationDetailPage() {
             {selectedCount > 0 ? (
               <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
                 <div className="space-y-1">
-                  <h2 className="text-sm font-semibold text-white">Connected repositories</h2>
+                  <h2 className="text-[13px] font-semibold text-white">Connected repositories</h2>
                   <p className="text-[13px] text-white/45">Repositories with active webhook configurations.</p>
                 </div>
                 <div className="divide-y divide-white/5 rounded-lg border border-white/8">
@@ -444,7 +457,7 @@ function IntegrationDetailPage() {
             <div className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <h2 className="text-sm font-semibold text-white">All repositories</h2>
+                  <h2 className="text-[13px] font-semibold text-white">All repositories</h2>
                   <p className="text-[13px] text-white/45">
                     Select a repo to enable webhooks. Each selected repo gets its own webhook URL and secret you
                     configure in GitHub.
@@ -473,7 +486,7 @@ function IntegrationDetailPage() {
 
               <div className="max-h-[600px] divide-y divide-white/5 overflow-y-auto rounded-lg border border-white/8">
                 {loading ? (
-                  <div className="py-6 text-center text-sm text-white/45">Loading repositories...</div>
+                  <div className="py-6 text-center text-[13px] text-white/45">Loading repositories...</div>
                 ) : filteredRepositories.length ? (
                   filteredRepositories.map((repository) => (
                     <ExpandableRepoRow
@@ -488,9 +501,9 @@ function IntegrationDetailPage() {
                     />
                   ))
                 ) : githubState?.repositories.length ? (
-                  <div className="py-6 text-center text-sm text-white/45">No repositories match your search.</div>
+                  <div className="py-6 text-center text-[13px] text-white/45">No repositories match your search.</div>
                 ) : (
-                  <div className="py-6 text-center text-sm text-white/45">
+                  <div className="py-6 text-center text-[13px] text-white/45">
                     Connect GitHub to load repositories into this list.
                   </div>
                 )}

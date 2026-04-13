@@ -43,12 +43,15 @@ function TogglePill({ active }: { active: boolean }) {
   return (
     <div
       className={cn(
-        "relative flex h-6 w-11 items-center rounded-full border px-0.5 transition-colors",
-        active ? "border-sky-400/40 bg-sky-400/90" : "border-white/10 bg-white/[0.08]",
+        "relative flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors",
+        active ? "border-violet-300/40 bg-violet-300/90" : "border-white/10 bg-white/[0.08]",
       )}
     >
       <div
-        className={cn("size-4 rounded-full bg-white transition-transform", active ? "translate-x-5" : "translate-x-0")}
+        className={cn(
+          "size-3.5 rounded-full bg-white transition-transform",
+          active ? "translate-x-3.5" : "translate-x-0",
+        )}
       />
     </div>
   )
@@ -92,7 +95,7 @@ function IntegrationsPage() {
   return (
     <section className="px-5 py-5 md:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        {error ? <p className="text-sm text-rose-200/85">{error}</p> : null}
+        {error ? <p className="text-[13px] text-rose-200/85">{error}</p> : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {integrationCatalog.map((integration) => {
@@ -111,10 +114,14 @@ function IntegrationsPage() {
                       <CardDescription className="text-white/45">{integration.domain}</CardDescription>
                     </div>
                     <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/80 ring-1 ring-white/10">
-                      <HugeIcon icon={integration.icon} size={22} />
+                      {integration.image ? (
+                        <img src={integration.image} alt={integration.title} className="size-6" />
+                      ) : (
+                        <HugeIcon icon={integration.icon} size={22} />
+                      )}
                     </div>
                   </div>
-                  <p className="min-h-12 text-sm leading-6 text-white/65">{integration.description}</p>
+                  <p className="min-h-12 text-[13px] leading-6 text-white/65">{integration.description}</p>
                 </CardHeader>
                 <CardContent className="flex items-center justify-between gap-3">
                   <Button

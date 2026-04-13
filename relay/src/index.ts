@@ -4,10 +4,10 @@ import path from "node:path"
 import cors from "cors"
 import dotenv from "dotenv"
 import express from "express"
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, count, desc, eq, inArray } from "drizzle-orm"
 
 import { createDatabase } from "./db/client.js"
-import { githubRepositories, githubWebhookEvents, integrations } from "./db/schema.js"
+import { githubRepositories, githubWebhookEvents, integrations, triggerExecutions, triggers } from "./db/schema.js"
 import { startTunnel, stopTunnel } from "./tunnel.js"
 
 dotenv.config()
@@ -42,9 +42,67 @@ type GitHubWebhookPayload = {
   }
 }
 
+type GitHubHook = {
+  id: number
+  events: string[]
+  active: boolean
+  config: {
+    url?: string
+    content_type?: string
+  }
+}
+
+const GITHUB_STATIC_EVENTS = [
+  "branch_protection_rule",
+  "check_run",
+  "check_suite",
+  "code_scanning_alert",
+  "commit_comment",
+  "create",
+  "delete",
+  "dependabot_alert",
+  "deploy_key",
+  "deployment",
+  "deployment_status",
+  "discussion",
+  "discussion_comment",
+  "fork",
+  "gollum",
+  "issue_comment",
+  "issues",
+  "label",
+  "member",
+  "merge_group",
+  "milestone",
+  "package",
+  "page_build",
+  "ping",
+  "project",
+  "project_card",
+  "project_column",
+  "public",
+  "pull_request",
+  "pull_request_review",
+  "pull_request_review_comment",
+  "pull_request_review_thread",
+  "push",
+  "registry_package",
+  "release",
+  "repository",
+  "repository_dispatch",
+  "secret_scanning_alert",
+  "star",
+  "status",
+  "watch",
+  "workflow_dispatch",
+  "workflow_job",
+  "workflow_run",
+]
+
 type IntegrationRow = typeof integrations.$inferSelect
 type RepositoryRow = typeof githubRepositories.$inferSelect
 type WebhookEventRow = typeof githubWebhookEvents.$inferSelect
+type TriggerRow = typeof triggers.$inferSelect
 
 const config: {
   port: number
@@ -124,6 +182,147 @@ async function fetchGitHubRepositories(apiKey: string) {
   }
 
   return repositories
+}
+
+async function createGitHubWebhook(
+  apiKey: string,
+  owner: string,
+  repo: string,
+  webhookUrl: string,
+  secret: string,
+): Promise<number | null> {
+  try {
+    const hook = await githubRequest<GitHubHook>(apiKey, `/repos/${owner}/${repo}/hooks`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: "web",
+        active: true,
+        events: ["*"],
+        config: {
+          url: webhookUrl,
+          content_type: "json",
+          secret,
+          insecure_ssl: "0",
+        },
+      }),
+    })
+    return hook.id
+  } catch {
+    return null
+  }
+}
+
+async function updateGitHubWebhookUrl(
+  apiKey: string,
+  owner: string,
+  repo: string,
+  hookId: number,
+  webhookUrl: string,
+  secret: string,
+): Promise<boolean> {
+  try {
+    await githubRequest<GitHubHook>(apiKey, `/repos/${owner}/${repo}/hooks/${hookId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        config: {
+          url: webhookUrl,
+          content_type: "json",
+          secret,
+          insecure_ssl: "0",
+        },
+      }),
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function deleteGitHubWebhook(apiKey: string, owner: string, repo: string, hookId: number): Promise<void> {
+  try {
+    await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks/${hookId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${apiKey}`,
+        "User-Agent": "argus-relay/0.1.0",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    })
+  } catch {
+    // Best-effort cleanup
+  }
+}
+
+async function syncAllWebhookUrls() {
+  const [integration]: IntegrationRow[] = await db
+    .select()
+    .from(integrations)
+    .where(eq(integrations.provider, "github"))
+
+  if (!integration?.apiKey) return
+
+  const repos: RepositoryRow[] = await db
+    .select()
+    .from(githubRepositories)
+    .where(and(eq(githubRepositories.integrationId, integration.id), eq(githubRepositories.isSelected, true)))
+
+  let updated = 0
+
+  for (const repo of repos) {
+    if (!repo.webhookKey || !repo.webhookSecret) continue
+
+    const webhookUrl = `${config.relayBaseUrl}/webhooks/github/${repo.webhookKey}`
+
+    if (repo.githubWebhookId) {
+      const success = await updateGitHubWebhookUrl(
+        integration.apiKey,
+        repo.owner,
+        repo.name,
+        repo.githubWebhookId,
+        webhookUrl,
+        repo.webhookSecret,
+      )
+      if (success) {
+        updated += 1
+      } else {
+        // Hook may have been deleted on GitHub — recreate it
+        const newHookId = await createGitHubWebhook(
+          integration.apiKey,
+          repo.owner,
+          repo.name,
+          webhookUrl,
+          repo.webhookSecret,
+        )
+        if (newHookId) {
+          await db
+            .update(githubRepositories)
+            .set({ githubWebhookId: newHookId, webhookStatus: "active", updatedAt: now() })
+            .where(eq(githubRepositories.id, repo.id))
+          updated += 1
+        }
+      }
+    } else {
+      const hookId = await createGitHubWebhook(
+        integration.apiKey,
+        repo.owner,
+        repo.name,
+        webhookUrl,
+        repo.webhookSecret,
+      )
+      if (hookId) {
+        await db
+          .update(githubRepositories)
+          .set({ githubWebhookId: hookId, webhookStatus: "active", updatedAt: now() })
+          .where(eq(githubRepositories.id, repo.id))
+        updated += 1
+      }
+    }
+  }
+
+  if (updated > 0) {
+    console.log(`Updated ${updated} webhook(s) to ${config.relayBaseUrl}`)
+  }
 }
 
 async function upsertGitHubIntegration(apiKey: string) {
@@ -291,6 +490,7 @@ async function getGitHubIntegrationState() {
       selected: Boolean(repository.isSelected),
       webhookUrl: repository.webhookKey ? `${config.relayBaseUrl}/webhooks/github/${repository.webhookKey}` : null,
       webhookSecret: repository.webhookSecret ?? null,
+      webhookManaged: Boolean(repository.githubWebhookId),
       webhookStatus: repository.webhookStatus,
       webhookLastReceivedAt: repository.webhookLastReceivedAt,
       htmlUrl: repository.htmlUrl,
@@ -364,10 +564,36 @@ async function setRepositorySelected(repositoryId: string, enabled: boolean) {
     updatedAt: now(),
   }
 
-  if (enabled && (!repository.webhookKey || !repository.webhookSecret)) {
-    updates.webhookKey = crypto.randomUUID()
-    updates.webhookSecret = crypto.randomUUID().replace(/-/g, "")
-    updates.webhookStatus = "ready"
+  if (enabled) {
+    const webhookKey = repository.webhookKey ?? crypto.randomUUID()
+    const webhookSecret = repository.webhookSecret ?? crypto.randomUUID().replace(/-/g, "")
+    updates.webhookKey = webhookKey
+    updates.webhookSecret = webhookSecret
+
+    if (integration.apiKey) {
+      const webhookUrl = `${config.relayBaseUrl}/webhooks/github/${webhookKey}`
+      const hookId = await createGitHubWebhook(
+        integration.apiKey,
+        repository.owner,
+        repository.name,
+        webhookUrl,
+        webhookSecret,
+      )
+      if (hookId) {
+        updates.githubWebhookId = hookId
+        updates.webhookStatus = "active"
+      } else {
+        updates.webhookStatus = "ready"
+      }
+    } else {
+      updates.webhookStatus = "ready"
+    }
+  } else {
+    if (repository.githubWebhookId && integration.apiKey) {
+      await deleteGitHubWebhook(integration.apiKey, repository.owner, repository.name, repository.githubWebhookId)
+    }
+    updates.githubWebhookId = null
+    updates.webhookStatus = "not_configured"
   }
 
   await db.update(githubRepositories).set(updates).where(eq(githubRepositories.id, repository.id))
@@ -389,15 +615,20 @@ async function recordWebhookEvent({
   payload: Record<string, unknown>
   receivedAt: string
 }) {
-  await db.insert(githubWebhookEvents).values({
-    integrationId: repository.integrationId,
-    repositoryId: repository.repositoryId,
-    deliveryId,
-    eventType,
-    source,
-    payloadJson: JSON.stringify(payload),
-    receivedAt,
-  })
+  const result = db
+    .insert(githubWebhookEvents)
+    .values({
+      integrationId: repository.integrationId,
+      repositoryId: repository.repositoryId,
+      deliveryId,
+      eventType,
+      source,
+      payloadJson: JSON.stringify(payload),
+      receivedAt,
+    })
+    .returning({ id: githubWebhookEvents.id })
+
+  const [inserted] = await result
 
   await db
     .update(githubRepositories)
@@ -407,6 +638,81 @@ async function recordWebhookEvent({
       updatedAt: receivedAt,
     })
     .where(eq(githubRepositories.id, repository.id))
+
+  if (inserted) {
+    await evaluateTriggers(inserted.id, "github", eventType, payload)
+  }
+}
+
+type TriggerCondition = {
+  field: string
+  operator: "equals" | "not_equals" | "contains"
+  value: string
+}
+
+function resolveField(object: Record<string, unknown>, path: string): unknown {
+  let current: unknown = object
+  for (const segment of path.split(".")) {
+    if (current == null || typeof current !== "object") return undefined
+    current = (current as Record<string, unknown>)[segment]
+  }
+  return current
+}
+
+function evaluateConditions(payload: Record<string, unknown>, conditions: TriggerCondition[]): boolean {
+  for (const condition of conditions) {
+    const actual = resolveField(payload, condition.field)
+    const actualStr = actual == null ? "" : String(actual)
+
+    switch (condition.operator) {
+      case "equals":
+        if (actualStr !== condition.value) return false
+        break
+      case "not_equals":
+        if (actualStr === condition.value) return false
+        break
+      case "contains":
+        if (!actualStr.includes(condition.value)) return false
+        break
+    }
+  }
+  return true
+}
+
+async function evaluateTriggers(
+  webhookEventId: number,
+  provider: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+) {
+  const matchingTriggers: TriggerRow[] = await db
+    .select()
+    .from(triggers)
+    .where(and(eq(triggers.provider, provider), eq(triggers.eventType, eventType), eq(triggers.enabled, true)))
+
+  let fired = 0
+  const timestamp = now()
+
+  for (const trigger of matchingTriggers) {
+    const conditions: TriggerCondition[] = trigger.conditionsJson
+      ? (JSON.parse(trigger.conditionsJson) as TriggerCondition[])
+      : []
+
+    if (conditions.length === 0 || evaluateConditions(payload, conditions)) {
+      await db.insert(triggerExecutions).values({
+        triggerId: trigger.id,
+        webhookEventId,
+        matchedAt: timestamp,
+      })
+      fired += 1
+    }
+  }
+
+  if (fired > 0) {
+    console.log(`${fired} trigger(s) fired for ${provider}/${eventType}`)
+  }
+
+  return fired
 }
 
 function verifySignature(rawBody: Buffer, secret: string, signatureHeader: string | undefined) {
@@ -516,6 +822,54 @@ app.post("/api/integrations/github/repositories/:repositoryId/webhook/configure"
   }
 })
 
+app.get("/api/integrations/github/available-events", async (_request, response) => {
+  const [integration]: IntegrationRow[] = await db
+    .select()
+    .from(integrations)
+    .where(eq(integrations.provider, "github"))
+
+  if (!integration?.apiKey) {
+    response.json({ events: GITHUB_STATIC_EVENTS, source: "static_fallback" })
+    return
+  }
+
+  const selectedRepos: RepositoryRow[] = await db
+    .select()
+    .from(githubRepositories)
+    .where(and(eq(githubRepositories.integrationId, integration.id), eq(githubRepositories.isSelected, true)))
+
+  if (selectedRepos.length === 0) {
+    response.json({ events: GITHUB_STATIC_EVENTS, source: "static_fallback" })
+    return
+  }
+
+  try {
+    const allEvents = new Set<string>()
+
+    for (const repo of selectedRepos) {
+      try {
+        const hooks = await githubRequest<GitHubHook[]>(integration.apiKey, `/repos/${repo.owner}/${repo.name}/hooks`)
+        for (const hook of hooks) {
+          for (const event of hook.events) {
+            allEvents.add(event)
+          }
+        }
+      } catch {
+        // Individual repo may fail if PAT lacks admin:repo_hook — skip it
+      }
+    }
+
+    if (allEvents.size === 0) {
+      response.json({ events: GITHUB_STATIC_EVENTS, source: "static_fallback" })
+      return
+    }
+
+    response.json({ events: [...allEvents].sort(), source: "github_api" })
+  } catch {
+    response.json({ events: GITHUB_STATIC_EVENTS, source: "static_fallback" })
+  }
+})
+
 app.post("/api/integrations/github/repositories/:repositoryId/test-webhook", async (request, response) => {
   const [integration] = await db.select().from(integrations).where(eq(integrations.provider, "github"))
   if (!integration) {
@@ -605,16 +959,221 @@ app.post("/webhooks/github/:webhookKey", express.raw({ type: "*/*" }), async (re
   response.json({ ok: true })
 })
 
+// --- Triggers CRUD ---
+
+app.get("/api/triggers", async (_request, response) => {
+  const allTriggers: TriggerRow[] = await db.select().from(triggers).orderBy(desc(triggers.createdAt))
+
+  const executionCounts = await db
+    .select({ triggerId: triggerExecutions.triggerId, count: count() })
+    .from(triggerExecutions)
+    .groupBy(triggerExecutions.triggerId)
+  const countMap = new Map(executionCounts.map((row) => [row.triggerId, row.count]))
+
+  const lastExecutions = await db
+    .select({
+      triggerId: triggerExecutions.triggerId,
+      matchedAt: triggerExecutions.matchedAt,
+    })
+    .from(triggerExecutions)
+    .orderBy(desc(triggerExecutions.matchedAt))
+  const lastFiredMap = new Map<string, string>()
+  for (const row of lastExecutions) {
+    if (!lastFiredMap.has(row.triggerId)) {
+      lastFiredMap.set(row.triggerId, row.matchedAt)
+    }
+  }
+
+  response.json(
+    allTriggers.map((trigger) => ({
+      id: trigger.id,
+      name: trigger.name,
+      provider: trigger.provider,
+      eventType: trigger.eventType,
+      conditions: trigger.conditionsJson ? JSON.parse(trigger.conditionsJson) : [],
+      actionPrompt: trigger.actionPrompt ?? null,
+      enabled: Boolean(trigger.enabled),
+      executionCount: countMap.get(trigger.id) ?? 0,
+      lastFiredAt: lastFiredMap.get(trigger.id) ?? null,
+      createdAt: trigger.createdAt,
+      updatedAt: trigger.updatedAt,
+    })),
+  )
+})
+
+app.post("/api/triggers", express.json(), async (request, response) => {
+  const { name, provider, eventType, conditions, actionPrompt, enabled } = request.body ?? {}
+
+  if (!name || typeof name !== "string") {
+    response.status(400).json({ error: "Trigger name is required." })
+    return
+  }
+  if (!provider || typeof provider !== "string") {
+    response.status(400).json({ error: "Provider is required." })
+    return
+  }
+  if (!eventType || typeof eventType !== "string") {
+    response.status(400).json({ error: "Event type is required." })
+    return
+  }
+
+  const timestamp = now()
+  const id = crypto.randomUUID()
+  const promptValue = typeof actionPrompt === "string" && actionPrompt.trim() ? actionPrompt.trim() : null
+
+  await db.insert(triggers).values({
+    id,
+    name: name.trim(),
+    provider,
+    eventType,
+    conditionsJson: Array.isArray(conditions) && conditions.length > 0 ? JSON.stringify(conditions) : null,
+    actionPrompt: promptValue,
+    enabled: enabled !== false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  const [created]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, id))
+  response.json({
+    id: created.id,
+    name: created.name,
+    provider: created.provider,
+    eventType: created.eventType,
+    conditions: created.conditionsJson ? JSON.parse(created.conditionsJson) : [],
+    actionPrompt: created.actionPrompt ?? null,
+    enabled: Boolean(created.enabled),
+    executionCount: 0,
+    lastFiredAt: null,
+    createdAt: created.createdAt,
+    updatedAt: created.updatedAt,
+  })
+})
+
+app.patch("/api/triggers/:triggerId", express.json(), async (request, response) => {
+  const [existing]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, request.params.triggerId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Trigger not found." })
+    return
+  }
+
+  const updates: Partial<typeof triggers.$inferInsert> = { updatedAt: now() }
+
+  if (request.body.name !== undefined) updates.name = String(request.body.name).trim()
+  if (request.body.provider !== undefined) updates.provider = String(request.body.provider)
+  if (request.body.eventType !== undefined) updates.eventType = String(request.body.eventType)
+  if (request.body.enabled !== undefined) updates.enabled = Boolean(request.body.enabled)
+  if (request.body.conditions !== undefined) {
+    updates.conditionsJson =
+      Array.isArray(request.body.conditions) && request.body.conditions.length > 0
+        ? JSON.stringify(request.body.conditions)
+        : null
+  }
+  if (request.body.actionPrompt !== undefined) {
+    const val = request.body.actionPrompt
+    updates.actionPrompt = typeof val === "string" && val.trim() ? val.trim() : null
+  }
+
+  await db.update(triggers).set(updates).where(eq(triggers.id, existing.id))
+
+  const [updated]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, existing.id))
+  const [execCount] = await db
+    .select({ count: count() })
+    .from(triggerExecutions)
+    .where(eq(triggerExecutions.triggerId, existing.id))
+  const [lastExec] = await db
+    .select({ matchedAt: triggerExecutions.matchedAt })
+    .from(triggerExecutions)
+    .where(eq(triggerExecutions.triggerId, existing.id))
+    .orderBy(desc(triggerExecutions.matchedAt))
+    .limit(1)
+
+  response.json({
+    id: updated.id,
+    name: updated.name,
+    provider: updated.provider,
+    eventType: updated.eventType,
+    conditions: updated.conditionsJson ? JSON.parse(updated.conditionsJson) : [],
+    actionPrompt: updated.actionPrompt ?? null,
+    enabled: Boolean(updated.enabled),
+    executionCount: execCount?.count ?? 0,
+    lastFiredAt: lastExec?.matchedAt ?? null,
+    createdAt: updated.createdAt,
+    updatedAt: updated.updatedAt,
+  })
+})
+
+app.delete("/api/triggers/:triggerId", async (request, response) => {
+  const [existing]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, request.params.triggerId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Trigger not found." })
+    return
+  }
+
+  await db.delete(triggerExecutions).where(eq(triggerExecutions.triggerId, existing.id))
+  await db.delete(triggers).where(eq(triggers.id, existing.id))
+
+  response.json({ ok: true })
+})
+
+app.get("/api/triggers/:triggerId/executions", async (request, response) => {
+  const [existing]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, request.params.triggerId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Trigger not found." })
+    return
+  }
+
+  const executions = await db
+    .select({
+      id: triggerExecutions.id,
+      matchedAt: triggerExecutions.matchedAt,
+      webhookEventId: triggerExecutions.webhookEventId,
+      eventType: githubWebhookEvents.eventType,
+      repositoryId: githubWebhookEvents.repositoryId,
+      payloadJson: githubWebhookEvents.payloadJson,
+      receivedAt: githubWebhookEvents.receivedAt,
+    })
+    .from(triggerExecutions)
+    .leftJoin(githubWebhookEvents, eq(triggerExecutions.webhookEventId, githubWebhookEvents.id))
+    .where(eq(triggerExecutions.triggerId, existing.id))
+    .orderBy(desc(triggerExecutions.matchedAt))
+    .limit(50)
+
+  response.json({
+    trigger: {
+      id: existing.id,
+      name: existing.name,
+      provider: existing.provider,
+      eventType: existing.eventType,
+      conditions: existing.conditionsJson ? JSON.parse(existing.conditionsJson) : [],
+      actionPrompt: existing.actionPrompt ?? null,
+      enabled: Boolean(existing.enabled),
+    },
+    executions: executions.map((row) => ({
+      id: row.id,
+      matchedAt: row.matchedAt,
+      webhookEventId: row.webhookEventId,
+      eventType: row.eventType,
+      repositoryId: row.repositoryId,
+      payload: row.payloadJson ? JSON.parse(row.payloadJson) : null,
+      receivedAt: row.receivedAt,
+    })),
+  })
+})
+
 app.listen(config.port, () => {
   console.log(`Argus relay listening on http://127.0.0.1:${config.port}`)
 
   if (shouldAutoTunnel()) {
     console.log("Starting Cloudflare tunnel...")
     startTunnel(config.port)
-      .then((tunnelUrl) => {
+      .then(async (tunnelUrl) => {
         config.relayBaseUrl = tunnelUrl
         console.log(`Tunnel ready: ${tunnelUrl}`)
-        console.log("Webhook URLs will use this tunnel address.")
+        console.log("Syncing webhook URLs to new tunnel address...")
+        await syncAllWebhookUrls()
       })
       .catch((error) => {
         console.error("Tunnel failed to start:", error instanceof Error ? error.message : error)

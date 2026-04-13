@@ -34,6 +34,7 @@ const githubRepositories = sqliteTable("github_repositories", {
   isSelected: integer("is_selected", { mode: "boolean" }).notNull().default(false),
   webhookKey: text("webhook_key"),
   webhookSecret: text("webhook_secret"),
+  githubWebhookId: integer("github_webhook_id"),
   webhookStatus: text("webhook_status").notNull().default("not_configured"),
   webhookLastReceivedAt: text("webhook_last_received_at"),
   lastSyncedAt: text("last_synced_at"),
@@ -51,4 +52,22 @@ const githubWebhookEvents = sqliteTable("github_webhook_events", {
   receivedAt: text("received_at").notNull(),
 })
 
-export { githubRepositories, githubWebhookEvents, integrations }
+const triggers = sqliteTable("triggers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  provider: text("provider").notNull(),
+  eventType: text("event_type").notNull(),
+  conditionsJson: text("conditions_json"),
+  actionPrompt: text("action_prompt"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  ...timestamps,
+})
+
+const triggerExecutions = sqliteTable("trigger_executions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  triggerId: text("trigger_id").notNull(),
+  webhookEventId: integer("webhook_event_id").notNull(),
+  matchedAt: text("matched_at").notNull(),
+})
+
+export { githubRepositories, githubWebhookEvents, integrations, triggerExecutions, triggers }

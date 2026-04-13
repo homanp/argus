@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Link, useRouterState } from "@tanstack/react-router"
 import { GithubIcon, Settings01Icon } from "@hugeicons/core-free-icons"
 
@@ -16,6 +17,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
+import { getTriggers } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
@@ -23,6 +25,28 @@ function AppSidebar() {
     select: (state) => state.location.pathname,
   })
   const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
+
+  const [triggerCount, setTriggerCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getTriggers()
+      .then((data) => {
+        if (!cancelled) setTriggerCount(data.length)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
+
+  const resolvedWorkspaceNav = useMemo(
+    () =>
+      workspaceNavigation.map((item) =>
+        item.title === "Triggers" && triggerCount !== null ? { ...item, count: String(triggerCount) } : item,
+      ),
+    [triggerCount],
+  )
 
   return (
     <Sidebar collapsible="icon" className="border-white/8 pt-9">
@@ -73,7 +97,7 @@ function AppSidebar() {
             Workspace
           </SidebarGroupLabel>
           <SidebarMenu>
-            {workspaceNavigation.map((item) => (
+            {resolvedWorkspaceNav.map((item) => (
               <SidebarMenuItem key={item.title}>
                 {item.href ? (
                   <SidebarMenuButton

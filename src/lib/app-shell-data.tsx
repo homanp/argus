@@ -87,7 +87,7 @@ const workspaceNavigation: NavigationItem[] = [
   {
     title: "Triggers",
     icon: ZapIcon,
-    count: "12",
+    href: "/triggers",
   },
   {
     title: "Channels",
