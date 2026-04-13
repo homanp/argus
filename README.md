@@ -122,9 +122,87 @@ if you want a chatbot, argus is not for you. if you want an assistant that prove
 
 ## getting started
 
-_technical setup, installation, configuration, and architecture documentation will live here._
+argus is a tauri desktop app with a local relay server that receives webhooks on your behalf.
 
-_(coming soon)_
+### prerequisites
+
+- node.js 20+
+- rust / cargo (for the tauri desktop shell)
+- npm
+
+### install dependencies
+
+```bash
+npm install
+cd relay && npm install && cd ..
+```
+
+### start the relay
+
+the relay is a small express server that stores connector state in SQLite (via drizzle ORM) and receives webhooks from providers like github. a cloudflare tunnel starts automatically so webhook URLs are publicly reachable without any manual setup.
+
+```bash
+cp relay/.env.example relay/.env
+npm run relay:dev
+```
+
+you should see output like:
+
+```
+Argus relay listening on http://127.0.0.1:8787
+Starting Cloudflare tunnel...
+Tunnel ready: https://xxx.trycloudflare.com
+```
+
+the tunnel URL is what github will use to deliver webhooks. it changes on every restart (free tier), so you'll need to update the webhook URL in github if you restart the relay.
+
+to skip the tunnel and use your own public domain instead, set `RELAY_BASE_URL` in `relay/.env`:
+
+```
+RELAY_BASE_URL=https://relay.your-domain.com
+```
+
+### start the desktop app
+
+in a separate terminal:
+
+```bash
+npm run tauri dev
+```
+
+### connect github
+
+1. create a [github personal access token](https://github.com/settings/tokens) with `repo` scope
+2. open the app and navigate to **connectors**
+3. click **view integration** on the github card
+4. paste the token and click **connect github**
+5. select the repos you want to watch — each one gets a unique webhook URL and secret
+6. expand a repo to see the webhook URL and secret, then add a webhook in your github repo settings:
+   - **settings → webhooks → add webhook**
+   - paste the payload URL
+   - set content type to `application/json`
+   - paste the secret
+   - choose which events to subscribe to
+7. click **test webhook** to verify the local path works, then push a commit or open a PR to see real events flow through
+
+### relay architecture
+
+```
+relay/
+├── src/
+│   ├── index.ts          # express server, API routes, webhook receiver
+│   ├── tunnel.ts          # auto-starts a cloudflare tunnel on boot
+│   └── db/
+│       ├── schema.ts      # drizzle ORM schema (integrations, repos, events)
+│       └── client.ts      # SQLite connection via better-sqlite3
+├── data/
+│   └── relay.db           # local SQLite database (auto-created)
+├── .env.example
+├── package.json
+└── tsconfig.json
+```
+
+the relay owns all provider credentials and webhook secrets. the desktop app talks to the relay over `http://127.0.0.1:8787` and never stores API keys locally.
 
 ---
 
