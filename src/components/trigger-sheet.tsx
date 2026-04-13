@@ -5,7 +5,7 @@ import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { cn } from "@/lib/utils"
+import { TogglePill } from "@/components/ui/toggle-pill"
 import { createTrigger, updateTrigger, type Trigger, type TriggerCondition } from "@/lib/relay-api"
 
 const PROVIDER_OPTIONS = [{ value: "github", label: "GitHub", icon: Github01Icon }]
@@ -14,26 +14,6 @@ const OPERATOR_OPTIONS: { value: TriggerCondition["operator"]; label: string }[]
   { value: "not_equals", label: "not equals" },
   { value: "contains", label: "contains" },
 ]
-
-function TogglePill({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors",
-        active ? "border-violet-300/40 bg-violet-300/90" : "border-white/10 bg-white/[0.08]",
-      )}
-    >
-      <div
-        className={cn(
-          "size-3.5 rounded-full bg-white transition-transform",
-          active ? "translate-x-3.5" : "translate-x-0",
-        )}
-      />
-    </button>
-  )
-}
 
 function ConditionRow({
   condition,
