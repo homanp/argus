@@ -70,4 +70,34 @@ const triggerExecutions = sqliteTable("trigger_executions", {
   matchedAt: text("matched_at").notNull(),
 })
 
-export { githubRepositories, githubWebhookEvents, integrations, triggerExecutions, triggers }
+const schedules = sqliteTable("schedules", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  prompt: text("prompt").notNull(),
+  cronExpression: text("cron_expression").notNull(),
+  timezone: text("timezone").notNull().default("UTC"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  nextRunAt: text("next_run_at"),
+  lastRunAt: text("last_run_at"),
+  ...timestamps,
+})
+
+const scheduleExecutions = sqliteTable("schedule_executions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  scheduleId: text("schedule_id").notNull(),
+  status: text("status").notNull(),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  resultMessage: text("result_message"),
+})
+
+export {
+  githubRepositories,
+  githubWebhookEvents,
+  integrations,
+  scheduleExecutions,
+  schedules,
+  triggerExecutions,
+  triggers,
+}

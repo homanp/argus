@@ -17,7 +17,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
-import { getTriggers } from "@/lib/relay-api"
+import { getSchedules, getTriggers } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
@@ -27,12 +27,18 @@ function AppSidebar() {
   const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
 
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  const [scheduleCount, setScheduleCount] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
     getTriggers()
       .then((data) => {
         if (!cancelled) setTriggerCount(data.length)
+      })
+      .catch(() => {})
+    getSchedules()
+      .then((data) => {
+        if (!cancelled) setScheduleCount(data.length)
       })
       .catch(() => {})
     return () => {
@@ -42,10 +48,12 @@ function AppSidebar() {
 
   const resolvedWorkspaceNav = useMemo(
     () =>
-      workspaceNavigation.map((item) =>
-        item.title === "Triggers" && triggerCount !== null ? { ...item, count: String(triggerCount) } : item,
-      ),
-    [triggerCount],
+      workspaceNavigation.map((item) => {
+        if (item.title === "Triggers" && triggerCount !== null) return { ...item, count: String(triggerCount) }
+        if (item.title === "Schedules" && scheduleCount !== null) return { ...item, count: String(scheduleCount) }
+        return item
+      }),
+    [triggerCount, scheduleCount],
   )
 
   return (

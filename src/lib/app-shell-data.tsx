@@ -97,7 +97,7 @@ const workspaceNavigation: NavigationItem[] = [
   {
     title: "Schedules",
     icon: Calendar03Icon,
-    count: "7",
+    href: "/schedules",
   },
   {
     title: "Agents",

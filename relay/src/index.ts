@@ -7,7 +7,16 @@ import express from "express"
 import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
 import { createDatabase } from "./db/client.js"
-import { githubRepositories, githubWebhookEvents, integrations, triggerExecutions, triggers } from "./db/schema.js"
+import {
+  githubRepositories,
+  githubWebhookEvents,
+  integrations,
+  scheduleExecutions,
+  schedules,
+  triggerExecutions,
+  triggers,
+} from "./db/schema.js"
+import { startScheduler, computeNextRunAt, isValidCron } from "./scheduler.js"
 import { startTunnel, stopTunnel } from "./tunnel.js"
 
 dotenv.config()
@@ -103,6 +112,7 @@ type IntegrationRow = typeof integrations.$inferSelect
 type RepositoryRow = typeof githubRepositories.$inferSelect
 type WebhookEventRow = typeof githubWebhookEvents.$inferSelect
 type TriggerRow = typeof triggers.$inferSelect
+type ScheduleRow = typeof schedules.$inferSelect
 
 const config: {
   port: number
@@ -1180,8 +1190,239 @@ app.get("/api/triggers/:triggerId/executions", async (request, response) => {
   })
 })
 
+// --- Schedules preview ---
+
+app.post("/api/schedules/preview", express.json(), (request, response) => {
+  const { cronExpression, timezone } = request.body ?? {}
+
+  if (!cronExpression || typeof cronExpression !== "string") {
+    response.status(400).json({ error: "Cron expression is required." })
+    return
+  }
+  if (!isValidCron(cronExpression)) {
+    response.status(400).json({ error: `Invalid cron expression: ${cronExpression}` })
+    return
+  }
+
+  const tz = typeof timezone === "string" && timezone.trim() ? timezone.trim() : "UTC"
+  const runs: string[] = []
+
+  try {
+    let cursor = new Date()
+    for (let i = 0; i < 3; i++) {
+      const next = computeNextRunAt(cronExpression, tz, cursor)
+      if (!next) break
+      runs.push(next)
+      cursor = new Date(new Date(next).getTime() + 1000)
+    }
+  } catch {
+    response.status(400).json({ error: "Failed to compute next runs." })
+    return
+  }
+
+  response.json({ runs })
+})
+
+// --- Schedules CRUD ---
+
+app.get("/api/schedules", async (_request, response) => {
+  const allSchedules: ScheduleRow[] = await db.select().from(schedules).orderBy(desc(schedules.createdAt))
+
+  const executionCounts = await db
+    .select({ scheduleId: scheduleExecutions.scheduleId, count: count() })
+    .from(scheduleExecutions)
+    .groupBy(scheduleExecutions.scheduleId)
+  const countMap = new Map(executionCounts.map((row) => [row.scheduleId, row.count]))
+
+  response.json(
+    allSchedules.map((schedule) => ({
+      id: schedule.id,
+      name: schedule.name,
+      description: schedule.description ?? null,
+      prompt: schedule.prompt,
+      cronExpression: schedule.cronExpression,
+      timezone: schedule.timezone,
+      enabled: Boolean(schedule.enabled),
+      nextRunAt: schedule.nextRunAt ?? null,
+      lastRunAt: schedule.lastRunAt ?? null,
+      executionCount: countMap.get(schedule.id) ?? 0,
+      createdAt: schedule.createdAt,
+      updatedAt: schedule.updatedAt,
+    })),
+  )
+})
+
+app.post("/api/schedules", express.json(), async (request, response) => {
+  const { name, description, prompt, cronExpression, timezone, enabled } = request.body ?? {}
+
+  if (!name || typeof name !== "string") {
+    response.status(400).json({ error: "Schedule name is required." })
+    return
+  }
+  if (!prompt || typeof prompt !== "string") {
+    response.status(400).json({ error: "Prompt is required." })
+    return
+  }
+  if (!cronExpression || typeof cronExpression !== "string") {
+    response.status(400).json({ error: "Cron expression is required." })
+    return
+  }
+  if (!isValidCron(cronExpression)) {
+    response.status(400).json({ error: `Invalid cron expression: ${cronExpression}` })
+    return
+  }
+
+  const tz = typeof timezone === "string" && timezone.trim() ? timezone.trim() : "UTC"
+  const timestamp = now()
+  const id = crypto.randomUUID()
+  const nextRunAt = computeNextRunAt(cronExpression, tz)
+
+  await db.insert(schedules).values({
+    id,
+    name: name.trim(),
+    description: typeof description === "string" && description.trim() ? description.trim() : null,
+    prompt: prompt.trim(),
+    cronExpression,
+    timezone: tz,
+    enabled: enabled !== false,
+    nextRunAt,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  const [created]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, id))
+  response.json({
+    id: created.id,
+    name: created.name,
+    description: created.description ?? null,
+    prompt: created.prompt,
+    cronExpression: created.cronExpression,
+    timezone: created.timezone,
+    enabled: Boolean(created.enabled),
+    nextRunAt: created.nextRunAt ?? null,
+    lastRunAt: created.lastRunAt ?? null,
+    executionCount: 0,
+    createdAt: created.createdAt,
+    updatedAt: created.updatedAt,
+  })
+})
+
+app.patch("/api/schedules/:scheduleId", express.json(), async (request, response) => {
+  const [existing]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, request.params.scheduleId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Schedule not found." })
+    return
+  }
+
+  const updates: Partial<typeof schedules.$inferInsert> = { updatedAt: now() }
+
+  if (request.body.name !== undefined) updates.name = String(request.body.name).trim()
+  if (request.body.description !== undefined) {
+    const val = request.body.description
+    updates.description = typeof val === "string" && val.trim() ? val.trim() : null
+  }
+  if (request.body.prompt !== undefined) updates.prompt = String(request.body.prompt).trim()
+  if (request.body.enabled !== undefined) updates.enabled = Boolean(request.body.enabled)
+  if (request.body.timezone !== undefined) updates.timezone = String(request.body.timezone).trim() || "UTC"
+
+  if (request.body.cronExpression !== undefined) {
+    const cron = String(request.body.cronExpression)
+    if (!isValidCron(cron)) {
+      response.status(400).json({ error: `Invalid cron expression: ${cron}` })
+      return
+    }
+    updates.cronExpression = cron
+  }
+
+  const finalCron = updates.cronExpression ?? existing.cronExpression
+  const finalTz = updates.timezone ?? existing.timezone
+  if (updates.cronExpression || updates.timezone || updates.enabled !== undefined) {
+    const isEnabled = updates.enabled ?? existing.enabled
+    updates.nextRunAt = isEnabled ? computeNextRunAt(finalCron, finalTz) : existing.nextRunAt
+  }
+
+  await db.update(schedules).set(updates).where(eq(schedules.id, existing.id))
+
+  const [updated]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, existing.id))
+  const [execCount] = await db
+    .select({ count: count() })
+    .from(scheduleExecutions)
+    .where(eq(scheduleExecutions.scheduleId, existing.id))
+
+  response.json({
+    id: updated.id,
+    name: updated.name,
+    description: updated.description ?? null,
+    prompt: updated.prompt,
+    cronExpression: updated.cronExpression,
+    timezone: updated.timezone,
+    enabled: Boolean(updated.enabled),
+    nextRunAt: updated.nextRunAt ?? null,
+    lastRunAt: updated.lastRunAt ?? null,
+    executionCount: execCount?.count ?? 0,
+    createdAt: updated.createdAt,
+    updatedAt: updated.updatedAt,
+  })
+})
+
+app.delete("/api/schedules/:scheduleId", async (request, response) => {
+  const [existing]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, request.params.scheduleId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Schedule not found." })
+    return
+  }
+
+  await db.delete(scheduleExecutions).where(eq(scheduleExecutions.scheduleId, existing.id))
+  await db.delete(schedules).where(eq(schedules.id, existing.id))
+
+  response.json({ ok: true })
+})
+
+app.get("/api/schedules/:scheduleId/executions", async (request, response) => {
+  const [existing]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, request.params.scheduleId))
+
+  if (!existing) {
+    response.status(404).json({ error: "Schedule not found." })
+    return
+  }
+
+  const executions = await db
+    .select()
+    .from(scheduleExecutions)
+    .where(eq(scheduleExecutions.scheduleId, existing.id))
+    .orderBy(desc(scheduleExecutions.startedAt))
+    .limit(50)
+
+  response.json({
+    schedule: {
+      id: existing.id,
+      name: existing.name,
+      description: existing.description ?? null,
+      prompt: existing.prompt,
+      cronExpression: existing.cronExpression,
+      timezone: existing.timezone,
+      enabled: Boolean(existing.enabled),
+      nextRunAt: existing.nextRunAt ?? null,
+      lastRunAt: existing.lastRunAt ?? null,
+    },
+    executions: executions.map((row) => ({
+      id: row.id,
+      status: row.status,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt ?? null,
+      resultMessage: row.resultMessage ?? null,
+    })),
+  })
+})
+
+let schedulerTimer: ReturnType<typeof setInterval> | null = null
+
 app.listen(config.port, () => {
   console.log(`Argus relay listening on http://127.0.0.1:${config.port}`)
+
+  schedulerTimer = startScheduler(db)
 
   if (shouldAutoTunnel()) {
     console.log("Starting Cloudflare tunnel...")
@@ -1202,6 +1443,7 @@ app.listen(config.port, () => {
 })
 
 process.on("SIGINT", () => {
+  if (schedulerTimer) clearInterval(schedulerTimer)
   stopTunnel()
   sqlite.close()
   process.exit(0)
