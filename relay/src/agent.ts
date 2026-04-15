@@ -195,7 +195,7 @@ function resolveAgentSlug(agentName: string): string | null {
 
 function checkSkillInstalled(agentName: string): { installed: boolean; path: string } {
   const slug = resolveAgentSlug(agentName)
-  const relativePath = (slug && SKILL_PATHS[slug]) ?? `.cursor/skills/argus/SKILL.md`
+  const relativePath = (slug && SKILL_PATHS[slug]) ?? `.agents/skills/argus/SKILL.md`
   const fullPath = path.join(os.homedir(), relativePath)
   return { installed: fs.existsSync(fullPath), path: fullPath }
 }
