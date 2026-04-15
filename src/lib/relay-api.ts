@@ -287,14 +287,96 @@ async function getScheduleExecutions(scheduleId: string) {
   return request<ScheduleDetailResponse>(`/api/schedules/${scheduleId}/executions`)
 }
 
+// ── Agent ──
+
+type AgentConfig = {
+  id: string
+  name: string
+  command: string
+  status: string
+  lastUsedAt: string | null
+  checkAgentOk: boolean | null
+  checkSkillOk: boolean | null
+  checkCliOk: boolean | null
+  lastCheckedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type DetectedAgent = {
+  slug: string
+  name: string
+  command: string
+  detected: boolean
+  image: string | null
+}
+
+type AgentTestResult = {
+  exitCode: number | null
+  stdout: string
+  stderr: string
+}
+
+async function getAgent() {
+  return request<AgentConfig | null>("/api/agent")
+}
+
+async function configureAgent(name: string, command: string) {
+  return request<AgentConfig>("/api/agent", {
+    method: "POST",
+    body: JSON.stringify({ name, command }),
+  })
+}
+
+async function removeAgent() {
+  return request<{ ok: true }>("/api/agent", {
+    method: "DELETE",
+  })
+}
+
+async function detectAgents() {
+  return request<DetectedAgent[]>("/api/agent/detect")
+}
+
+async function testAgent() {
+  return request<AgentTestResult>("/api/agent/test", {
+    method: "POST",
+  })
+}
+
+async function checkAgentSkill() {
+  return request<{ installed: boolean; path: string }>("/api/agent/check-skill")
+}
+
+async function checkAgentCli() {
+  return request<{ installed: boolean; path: string | null }>("/api/agent/check-cli")
+}
+
+type ValidateResult = {
+  agent: { ok: boolean; exitCode: number | null }
+  skill: { ok: boolean; path: string }
+  cli: { ok: boolean; path: string | null }
+  checkedAt: string
+}
+
+async function validateAgent() {
+  return request<ValidateResult>("/api/agent/validate", {
+    method: "POST",
+  })
+}
+
 export {
   RELAY_BASE_URL,
+  checkAgentCli,
+  checkAgentSkill,
+  configureAgent,
   connectGitHub,
   createSchedule,
   createTrigger,
-  previewSchedule,
+  detectAgents,
   deleteSchedule,
   deleteTrigger,
+  getAgent,
   getGitHubAvailableEvents,
   getGitHubIntegration,
   getScheduleExecutions,
@@ -302,14 +384,22 @@ export {
   getTriggerExecutions,
   getTriggers,
   prepareGitHubRepositoryWebhook,
+  previewSchedule,
+  removeAgent,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
+  testAgent,
   updateSchedule,
   updateTrigger,
+  validateAgent,
 }
 export type {
+  AgentConfig,
+  AgentTestResult,
   AvailableEventsResponse,
+  DetectedAgent,
+  ValidateResult,
   GitHubIntegrationRepository,
   GitHubIntegrationState,
   Schedule,

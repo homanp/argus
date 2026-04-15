@@ -104,6 +104,16 @@ function createDatabase(databasePath: string) {
       finished_at TEXT,
       result_message TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS agent (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      command TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_used_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `)
 
   const repoColumns = sqlite.pragma("table_info(github_repositories)") as { name: string }[]
@@ -114,6 +124,14 @@ function createDatabase(databasePath: string) {
   const triggerColumns = sqlite.pragma("table_info(triggers)") as { name: string }[]
   if (!triggerColumns.some((col) => col.name === "action_prompt")) {
     sqlite.exec("ALTER TABLE triggers ADD COLUMN action_prompt TEXT")
+  }
+
+  const agentColumns = sqlite.pragma("table_info(agent)") as { name: string }[]
+  if (!agentColumns.some((col) => col.name === "check_agent_ok")) {
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_agent_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_skill_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_cli_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN last_checked_at TEXT")
   }
 
   return {

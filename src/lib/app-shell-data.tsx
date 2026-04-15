@@ -26,6 +26,7 @@ type NavigationItem = {
   count?: string
   href?: string
   highlighted?: boolean
+  warning?: boolean
 }
 
 type TaskItem = {
@@ -102,7 +103,7 @@ const workspaceNavigation: NavigationItem[] = [
   {
     title: "Agents",
     icon: AiBrain02Icon,
-    count: "5",
+    href: "/agents",
   },
 ]
 

@@ -11,6 +11,7 @@ import {
 import {
   ActivitySparkIcon,
   Add01Icon,
+  AiBrain02Icon,
   ArrowLeft02Icon,
   Calendar03Icon,
   ConnectIcon,
@@ -26,7 +27,7 @@ import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
@@ -34,6 +35,7 @@ import IntegrationsPage from "@/pages/integrations-page"
 import ScheduleDetailPage from "@/pages/schedule-detail-page"
 import SchedulesPage from "@/pages/schedules-page"
 import TriggerDetailPage from "@/pages/trigger-detail-page"
+import AgentsPage from "@/pages/agents-page"
 import TriggersPage from "@/pages/triggers-page"
 
 const routeHeaderMap = {
@@ -55,6 +57,11 @@ const routeHeaderMap = {
     title: "Schedules",
     subtitle: "Scheduled prompts that run on a cron cadence",
     icon: Calendar03Icon,
+  },
+  "/agents": {
+    title: "Agent",
+    subtitle: "Configure the local CLI agent for triggers and schedules",
+    icon: AiBrain02Icon,
   },
 } as const
 
@@ -96,7 +103,7 @@ function RootLayout() {
     <div className="relative min-h-svh">
       <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-40 h-8" />
       <SidebarProvider
-        defaultOpen
+        defaultOpen={false}
         className="min-h-svh flex-1"
         style={
           {
@@ -109,7 +116,6 @@ function RootLayout() {
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent pt-0">
           <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
             <div className="flex min-w-0 items-center gap-2">
-              <SidebarTrigger className="size-6 rounded-sm p-0 text-white/35 hover:bg-white/[0.03] hover:text-white/70 md:hidden" />
               {providerTitle || isTriggersDetail || isSchedulesDetail ? (
                 <Link
                   to={isSchedulesDetail ? "/schedules" : isTriggersDetail ? "/triggers" : "/connectors"}
@@ -302,6 +308,24 @@ function RootLayout() {
                   </Button>
                 </ButtonGroup>
               )}
+              {pathname === "/agents" && (
+                <ButtonGroup>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:edit-agent"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-agent"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                  >
+                    Delete
+                  </Button>
+                </ButtonGroup>
+              )}
               {pathname === "/" && (
                 <>
                   <Button
@@ -364,6 +388,12 @@ const triggerDetailRoute = createRoute({
   component: TriggerDetailPage,
 })
 
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents",
+  component: AgentsPage,
+})
+
 const schedulesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/schedules",
@@ -384,6 +414,7 @@ const routeTree = rootRoute.addChildren([
   triggerDetailRoute,
   schedulesRoute,
   scheduleDetailRoute,
+  agentsRoute,
 ])
 
 export const router = createRouter({

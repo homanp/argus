@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
+import { Loading03Icon } from "@hugeicons/core-free-icons"
 
+import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -412,7 +414,16 @@ function ScheduleSheet({
             disabled={saving || !name.trim() || !prompt.trim() || !effectiveCron}
             className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
           >
-            {saving ? "Saving..." : editingSchedule ? "Save changes" : "Create schedule"}
+            {saving ? (
+              <>
+                <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                Saving...
+              </>
+            ) : editingSchedule ? (
+              "Save changes"
+            ) : (
+              "Create schedule"
+            )}
           </Button>
         </SheetFooter>
       </SheetContent>
