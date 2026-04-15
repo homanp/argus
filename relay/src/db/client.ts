@@ -126,6 +126,13 @@ function createDatabase(databasePath: string) {
     sqlite.exec("ALTER TABLE triggers ADD COLUMN action_prompt TEXT")
   }
 
+  const triggerExecColumns = sqlite.pragma("table_info(trigger_executions)") as { name: string }[]
+  if (!triggerExecColumns.some((col) => col.name === "status")) {
+    sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN status TEXT")
+    sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN finished_at TEXT")
+    sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN result_message TEXT")
+  }
+
   const agentColumns = sqlite.pragma("table_info(agent)") as { name: string }[]
   if (!agentColumns.some((col) => col.name === "check_agent_ok")) {
     sqlite.exec("ALTER TABLE agent ADD COLUMN check_agent_ok INTEGER")

@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react"
-
 import {
   createHashHistory,
   createRootRoute,
@@ -102,16 +100,7 @@ function RootLayout() {
   return (
     <div className="relative min-h-svh">
       <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-40 h-8" />
-      <SidebarProvider
-        defaultOpen={false}
-        className="min-h-svh flex-1"
-        style={
-          {
-            "--sidebar-width": "13.75rem",
-            "--sidebar-width-icon": "3.5rem",
-          } as CSSProperties
-        }
-      >
+      <SidebarProvider className="min-h-svh flex-1">
         <AppSidebar />
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent pt-0">
           <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">

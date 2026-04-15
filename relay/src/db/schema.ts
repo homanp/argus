@@ -68,6 +68,9 @@ const triggerExecutions = sqliteTable("trigger_executions", {
   triggerId: text("trigger_id").notNull(),
   webhookEventId: integer("webhook_event_id").notNull(),
   matchedAt: text("matched_at").notNull(),
+  status: text("status"),
+  finishedAt: text("finished_at"),
+  resultMessage: text("result_message"),
 })
 
 const schedules = sqliteTable("schedules", {

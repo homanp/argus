@@ -52,6 +52,13 @@ function clearNavbar() {
   if (statusEl) statusEl.className = "ml-1 hidden"
 }
 
+const statusDot: Record<string, string> = {
+  completed: "bg-emerald-400/80",
+  running: "bg-amber-400/80 animate-pulse",
+  failed: "bg-rose-400/80",
+  matched: "bg-white/30",
+}
+
 function ExecutionRow({ execution }: { execution: TriggerExecution }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -62,7 +69,7 @@ function ExecutionRow({ execution }: { execution: TriggerExecution }) {
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/[0.02]"
       >
-        <div className="size-1.5 shrink-0 rounded-full bg-emerald-400/80" />
+        <div className={`size-1.5 shrink-0 rounded-full ${statusDot[execution.status] ?? statusDot.matched}`} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] text-white/80">
             {execution.eventType ? formatEventType(execution.eventType) : "Unknown event"}
@@ -71,15 +78,37 @@ function ExecutionRow({ execution }: { execution: TriggerExecution }) {
           <p className="text-[11px] text-white/30">
             Matched {timeAgo(execution.matchedAt)}
             {execution.receivedAt && <> · received {timeAgo(execution.receivedAt)}</>}
+            {execution.status !== "matched" && (
+              <>
+                {" "}
+                ·{" "}
+                <span className={execution.status === "failed" ? "text-rose-300/60" : "text-white/30"}>
+                  {execution.status}
+                </span>
+              </>
+            )}
           </p>
         </div>
         <span className="shrink-0 text-[11px] text-white/20">{expanded ? "collapse" : "expand"}</span>
       </button>
-      {expanded && execution.payload && (
-        <div className="border-t border-white/5 bg-white/[0.015] px-4 py-3">
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
-            {JSON.stringify(execution.payload, null, 2)}
-          </pre>
+      {expanded && (
+        <div className="border-t border-white/5 bg-white/[0.015] px-4 py-3 space-y-3">
+          {execution.resultMessage && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium text-white/35">Agent response</p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
+                {execution.resultMessage}
+              </pre>
+            </div>
+          )}
+          {execution.payload && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium text-white/35">Webhook payload</p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
+                {JSON.stringify(execution.payload, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -100,6 +129,7 @@ function TriggerDetailPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [availableEvents, setAvailableEvents] = useState<string[]>([])
   const [eventsSource, setEventsSource] = useState<string>("static_fallback")
+  const [page, setPage] = useState(0)
 
   function reload() {
     setLoading(true)
@@ -192,6 +222,10 @@ function TriggerDetailPage() {
 
   const { trigger, executions } = data
 
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(executions.length / PAGE_SIZE))
+  const pagedExecutions = executions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   return (
     <section className="px-5 py-5 md:px-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
@@ -255,11 +289,38 @@ function TriggerDetailPage() {
           </div>
 
           {executions.length > 0 ? (
-            <div className="divide-y divide-white/5">
-              {executions.map((execution) => (
-                <ExecutionRow key={execution.id} execution={execution} />
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-white/5">
+                {pagedExecutions.map((execution) => (
+                  <ExecutionRow key={execution.id} execution={execution} />
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-white/6 px-4 py-2.5">
+                  <span className="text-[11px] tabular-nums text-white/30">
+                    {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, executions.length)} of {executions.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                      className="h-6 px-2 text-[11px] font-normal text-white/40 hover:bg-white/[0.04] hover:text-white/70 disabled:opacity-30"
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="h-6 px-2 text-[11px] font-normal text-white/40 hover:bg-white/[0.04] hover:text-white/70 disabled:opacity-30"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="px-4 py-8 text-center text-[13px] text-white/30">
               Waiting for matching webhook events...
