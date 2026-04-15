@@ -758,7 +758,7 @@ async function evaluateTriggers(
           triggerId: trigger.id,
           webhookEventId,
           matchedAt: timestamp,
-          status: trigger.actionPrompt ? "running" : "matched",
+          status: "matched",
         })
         .returning()
 
@@ -767,6 +767,8 @@ async function evaluateTriggers(
       if (trigger.actionPrompt) {
         const configured = getConfiguredAgent(db)
         if (configured && configured.status === "active") {
+          db.update(triggerExecutions).set({ status: "running" }).where(eq(triggerExecutions.id, execution.id)).run()
+
           const enrichedPrompt = buildTriggerContext(trigger, provider, eventType, payload)
           runAgent(configured.command, enrichedPrompt)
             .then((result) => {
