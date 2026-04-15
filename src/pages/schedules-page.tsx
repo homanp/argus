@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Calendar03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { Calendar03Icon, Loading03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
 import { useNavigate } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
@@ -171,7 +171,10 @@ function SchedulesPage() {
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
         {loading ? (
-          <div className="py-16 text-center text-[13px] text-white/45">Loading schedules...</div>
+          <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-white/45">
+            <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+            Loading schedules...
+          </div>
         ) : schedulesList.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">

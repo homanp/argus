@@ -26,6 +26,10 @@ type AgentConfig = {
   command: string
   status: string
   lastUsedAt: string | null
+  checkAgentOk: boolean | null
+  checkSkillOk: boolean | null
+  checkCliOk: boolean | null
+  lastCheckedAt: string | null
   createdAt: string
   updatedAt: string
 }

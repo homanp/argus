@@ -1512,6 +1512,49 @@ app.get("/api/agent/check-cli", async (_request, response) => {
   response.json(result)
 })
 
+app.post("/api/agent/validate", async (_request, response) => {
+  const configured = getConfiguredAgent(db)
+
+  if (!configured) {
+    response.status(400).json({ error: "No agent configured." })
+    return
+  }
+
+  const [agentResult, skillResult, cliResult] = await Promise.all([
+    runAgent(configured.command, "Respond with exactly: hello").catch(() => ({
+      exitCode: 1 as number | null,
+      stdout: "",
+      stderr: "spawn failed",
+    })),
+    Promise.resolve(checkSkillInstalled(configured.name)),
+    checkCliInstalled(),
+  ])
+
+  const timestamp = now()
+  const checkAgentOk = agentResult.exitCode === 0
+  const checkSkillOk = skillResult.installed
+  const checkCliOk = cliResult.installed
+
+  db.update(agentTable)
+    .set({
+      checkAgentOk,
+      checkSkillOk,
+      checkCliOk,
+      lastCheckedAt: timestamp,
+      lastUsedAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .where(eq(agentTable.id, "default"))
+    .run()
+
+  response.json({
+    agent: { ok: checkAgentOk, exitCode: agentResult.exitCode },
+    skill: { ok: checkSkillOk, path: skillResult.path },
+    cli: { ok: checkCliOk, path: cliResult.path },
+    checkedAt: timestamp,
+  })
+})
+
 let schedulerTimer: ReturnType<typeof setInterval> | null = null
 
 app.listen(config.port, () => {

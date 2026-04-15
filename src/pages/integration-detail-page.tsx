@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowDown01Icon, ArrowUp01Icon, Copy01Icon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
+import {
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+  Copy01Icon,
+  Loading03Icon,
+  Search01Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons"
 import { useRouterState } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
@@ -184,7 +191,14 @@ function ExpandableRepoRow({
                   size="sm"
                   className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
                 >
-                  {busy ? "Testing..." : "Test webhook"}
+                  {busy ? (
+                    <>
+                      <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    "Test webhook"
+                  )}
                 </Button>
                 {testSuccess && (
                   <span className="flex items-center gap-1 text-[12px] text-emerald-400">
@@ -464,7 +478,10 @@ function IntegrationDetailPage() {
               </div>
               <div className="max-h-[500px] divide-y divide-white/5 overflow-y-auto">
                 {loading ? (
-                  <div className="py-6 text-center text-[13px] text-white/40">Loading repositories...</div>
+                  <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-white/40">
+                    <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                    Loading repositories...
+                  </div>
                 ) : filteredRepositories.length ? (
                   filteredRepositories.map((repository) => (
                     <ExpandableRepoRow

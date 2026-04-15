@@ -126,6 +126,14 @@ function createDatabase(databasePath: string) {
     sqlite.exec("ALTER TABLE triggers ADD COLUMN action_prompt TEXT")
   }
 
+  const agentColumns = sqlite.pragma("table_info(agent)") as { name: string }[]
+  if (!agentColumns.some((col) => col.name === "check_agent_ok")) {
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_agent_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_skill_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN check_cli_ok INTEGER")
+    sqlite.exec("ALTER TABLE agent ADD COLUMN last_checked_at TEXT")
+  }
+
   return {
     sqlite,
     db: drizzle(sqlite, { schema }),

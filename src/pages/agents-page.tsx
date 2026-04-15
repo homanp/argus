@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AiBrain02Icon, CancelCircleIcon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons"
+import { AiBrain02Icon, CancelCircleIcon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  checkAgentCli,
-  checkAgentSkill,
   configureAgent,
   detectAgents,
   getAgent,
   removeAgent,
-  testAgent,
+  validateAgent,
   type AgentConfig,
-  type AgentTestResult,
   type DetectedAgent,
 } from "@/lib/relay-api"
 
@@ -34,16 +31,26 @@ function AgentsPage() {
   const [detected, setDetected] = useState<DetectedAgent[]>([])
   const [detecting, setDetecting] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(false)
   const [, setRemoving] = useState(false)
-  const [testResult, setTestResult] = useState<AgentTestResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [nameInput, setNameInput] = useState("")
   const [commandInput, setCommandInput] = useState("")
   const [editing, setEditing] = useState(false)
-  const [skillStatus, setSkillStatus] = useState<"idle" | "checking" | "installed" | "missing">("idle")
-  const [cliStatus, setCliStatus] = useState<"idle" | "checking" | "installed" | "missing">("idle")
+  const [validating, setValidating] = useState(false)
+
+  type CheckStatus = "idle" | "checking" | "pass" | "fail"
+  const [agentCheck, setAgentCheck] = useState<CheckStatus>("idle")
+  const [skillCheck, setSkillCheck] = useState<CheckStatus>("idle")
+  const [cliCheck, setCliCheck] = useState<CheckStatus>("idle")
+
+  function applyPersistedChecks(data: AgentConfig) {
+    if (data.lastCheckedAt) {
+      setAgentCheck(data.checkAgentOk ? "pass" : "fail")
+      setSkillCheck(data.checkSkillOk ? "pass" : "fail")
+      setCliCheck(data.checkCliOk ? "pass" : "fail")
+    }
+  }
 
   const loadAgent = useCallback(async () => {
     try {
@@ -52,6 +59,7 @@ function AgentsPage() {
       if (data) {
         setNameInput(data.name)
         setCommandInput(data.command)
+        applyPersistedChecks(data)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reach the local relay.")
@@ -90,7 +98,9 @@ function AgentsPage() {
       const result = await configureAgent(nameInput.trim(), commandInput.trim())
       setConfigured(result)
       setEditing(false)
-      setTestResult(null)
+      setAgentCheck("idle")
+      setSkillCheck("idle")
+      setCliCheck("idle")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save agent.")
     } finally {
@@ -106,8 +116,10 @@ function AgentsPage() {
       setConfigured(null)
       setNameInput("")
       setCommandInput("")
-      setTestResult(null)
       setEditing(false)
+      setAgentCheck("idle")
+      setSkillCheck("idle")
+      setCliCheck("idle")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove agent.")
     } finally {
@@ -115,31 +127,27 @@ function AgentsPage() {
     }
   }
 
-  const [validating, setValidating] = useState(false)
-
   async function handleValidateAll() {
     setValidating(true)
-    setTesting(true)
-    setSkillStatus("checking")
-    setCliStatus("checking")
-    setTestResult(null)
+    setAgentCheck("checking")
+    setSkillCheck("checking")
+    setCliCheck("checking")
     setError(null)
 
-    const [agentResult, skillResult, cliResult] = await Promise.all([
-      testAgent().catch((err) => ({
-        exitCode: null as number | null,
-        stdout: "",
-        stderr: err instanceof Error ? err.message : "Test failed",
-      })),
-      checkAgentSkill().catch(() => ({ installed: false, path: "" })),
-      checkAgentCli().catch(() => ({ installed: false, path: null })),
-    ])
-
-    setTestResult(agentResult)
-    setTesting(false)
-    setSkillStatus(skillResult.installed ? "installed" : "missing")
-    setCliStatus(cliResult.installed ? "installed" : "missing")
-    setValidating(false)
+    try {
+      const result = await validateAgent()
+      setAgentCheck(result.agent.ok ? "pass" : "fail")
+      setSkillCheck(result.skill.ok ? "pass" : "fail")
+      setCliCheck(result.cli.ok ? "pass" : "fail")
+      await loadAgent()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Validation failed.")
+      setAgentCheck("fail")
+      setSkillCheck("fail")
+      setCliCheck("fail")
+    } finally {
+      setValidating(false)
+    }
   }
 
   const handleEditRef = useRef(() => setEditing(true))
@@ -165,7 +173,10 @@ function AgentsPage() {
   if (configured === undefined) {
     return (
       <section className="px-5 py-5 md:px-6">
-        <div className="py-16 text-center text-[13px] text-white/45">Loading...</div>
+        <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-white/45">
+          <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+          Loading...
+        </div>
       </section>
     )
   }
@@ -209,9 +220,17 @@ function AgentsPage() {
                 <Button
                   onClick={handleValidateAll}
                   disabled={validating}
-                  className="bg-violet-300 text-[11px] font-medium text-violet-950 hover:bg-violet-200"
+                  variant="outline"
+                  className="border-white/10 bg-transparent text-[11px] font-normal text-white/50 hover:bg-white/[0.04] hover:text-white/70"
                 >
-                  {validating ? "Validating..." : "Validate"}
+                  {validating ? (
+                    <>
+                      <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    "Validate"
+                  )}
                 </Button>
               </div>
 
@@ -220,14 +239,14 @@ function AgentsPage() {
                   <p className="text-[12px] text-white/60">Agent CLI</p>
                   <p className="font-mono text-[11px] text-white/25">{configured.command}</p>
                 </div>
-                {testing && !testResult && <span className="text-[10px] text-white/30">Checking...</span>}
-                {testResult && testResult.exitCode === 0 && (
+                {agentCheck === "checking" && (
+                  <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-white/30" />
+                )}
+                {agentCheck === "pass" && (
                   <HugeIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-400" />
                 )}
-                {testResult && testResult.exitCode !== 0 && (
-                  <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />
-                )}
-                {!testing && !testResult && <span className="text-[10px] text-white/20">--</span>}
+                {agentCheck === "fail" && <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />}
+                {agentCheck === "idle" && <span className="text-[10px] text-white/20">--</span>}
               </div>
 
               <div className="flex items-center justify-between border-b border-white/6 px-4 py-2.5">
@@ -235,12 +254,14 @@ function AgentsPage() {
                   <p className="text-[12px] text-white/60">Argus skill</p>
                   <p className="font-mono text-[11px] text-white/25">npx skills add argus-ai/argus</p>
                 </div>
-                {skillStatus === "checking" && <span className="text-[10px] text-white/30">Checking...</span>}
-                {skillStatus === "installed" && (
+                {skillCheck === "checking" && (
+                  <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-white/30" />
+                )}
+                {skillCheck === "pass" && (
                   <HugeIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-400" />
                 )}
-                {skillStatus === "missing" && <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />}
-                {skillStatus === "idle" && <span className="text-[10px] text-white/20">--</span>}
+                {skillCheck === "fail" && <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />}
+                {skillCheck === "idle" && <span className="text-[10px] text-white/20">--</span>}
               </div>
 
               <div className="flex items-center justify-between px-4 py-2.5">
@@ -248,12 +269,14 @@ function AgentsPage() {
                   <p className="text-[12px] text-white/60">Argus CLI</p>
                   <p className="font-mono text-[11px] text-white/25">curl -fsSL https://argus.dev/install | bash</p>
                 </div>
-                {cliStatus === "checking" && <span className="text-[10px] text-white/30">Checking...</span>}
-                {cliStatus === "installed" && (
+                {cliCheck === "checking" && (
+                  <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-white/30" />
+                )}
+                {cliCheck === "pass" && (
                   <HugeIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-400" />
                 )}
-                {cliStatus === "missing" && <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />}
-                {cliStatus === "idle" && <span className="text-[10px] text-white/20">--</span>}
+                {cliCheck === "fail" && <HugeIcon icon={CancelCircleIcon} size={16} className="text-rose-400" />}
+                {cliCheck === "idle" && <span className="text-[10px] text-white/20">--</span>}
               </div>
             </div>
           </div>
@@ -289,7 +312,10 @@ function AgentsPage() {
             )}
 
             {detecting && detectedAvailable.length === 0 && !configured && (
-              <p className="text-[12px] text-white/35">Scanning for installed agent CLIs...</p>
+              <div className="flex items-center gap-2 text-[12px] text-white/35">
+                <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                Scanning for installed agent CLIs...
+              </div>
             )}
 
             {!detecting && detectedAvailable.length === 0 && !configured && (
@@ -337,7 +363,16 @@ function AgentsPage() {
                   disabled={saving || !nameInput.trim() || !commandInput.trim()}
                   className="bg-violet-300 text-[11px] font-medium text-violet-950 hover:bg-violet-200"
                 >
-                  {saving ? "Saving..." : configured ? "Update" : "Save"}
+                  {saving ? (
+                    <>
+                      <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : configured ? (
+                    "Update"
+                  ) : (
+                    "Save"
+                  )}
                 </Button>
                 {editing && configured && (
                   <Button

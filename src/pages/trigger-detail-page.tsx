@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
+import { Loading03Icon } from "@hugeicons/core-free-icons"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 
+import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { TriggerSheet } from "@/components/trigger-sheet"
 import {
@@ -170,7 +172,10 @@ function TriggerDetailPage() {
   if (loading) {
     return (
       <section className="px-5 py-5 md:px-6">
-        <div className="mx-auto max-w-3xl py-16 text-center text-[13px] text-white/40">Loading trigger...</div>
+        <div className="mx-auto flex max-w-3xl items-center justify-center gap-2 py-16 text-[13px] text-white/40">
+          <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+          Loading trigger...
+        </div>
       </section>
     )
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Add01Icon, Delete02Icon, Github01Icon } from "@hugeicons/core-free-icons"
+import { Add01Icon, Delete02Icon, Github01Icon, Loading03Icon } from "@hugeicons/core-free-icons"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
@@ -245,7 +245,16 @@ function TriggerSheet({
             disabled={saving || !name.trim() || !eventType}
             className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
           >
-            {saving ? "Saving..." : editingTrigger ? "Save changes" : "Create trigger"}
+            {saving ? (
+              <>
+                <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                Saving...
+              </>
+            ) : editingTrigger ? (
+              "Save changes"
+            ) : (
+              "Create trigger"
+            )}
           </Button>
         </SheetFooter>
       </SheetContent>

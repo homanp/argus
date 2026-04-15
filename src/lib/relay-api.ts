@@ -295,6 +295,10 @@ type AgentConfig = {
   command: string
   status: string
   lastUsedAt: string | null
+  checkAgentOk: boolean | null
+  checkSkillOk: boolean | null
+  checkCliOk: boolean | null
+  lastCheckedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -348,6 +352,19 @@ async function checkAgentCli() {
   return request<{ installed: boolean; path: string | null }>("/api/agent/check-cli")
 }
 
+type ValidateResult = {
+  agent: { ok: boolean; exitCode: number | null }
+  skill: { ok: boolean; path: string }
+  cli: { ok: boolean; path: string | null }
+  checkedAt: string
+}
+
+async function validateAgent() {
+  return request<ValidateResult>("/api/agent/validate", {
+    method: "POST",
+  })
+}
+
 export {
   RELAY_BASE_URL,
   checkAgentCli,
@@ -375,12 +392,14 @@ export {
   testAgent,
   updateSchedule,
   updateTrigger,
+  validateAgent,
 }
 export type {
   AgentConfig,
   AgentTestResult,
   AvailableEventsResponse,
   DetectedAgent,
+  ValidateResult,
   GitHubIntegrationRepository,
   GitHubIntegrationState,
   Schedule,
