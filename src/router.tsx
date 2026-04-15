@@ -11,6 +11,7 @@ import {
 import {
   ActivitySparkIcon,
   Add01Icon,
+  AiBrain02Icon,
   ArrowLeft02Icon,
   Calendar03Icon,
   ConnectIcon,
@@ -34,6 +35,7 @@ import IntegrationsPage from "@/pages/integrations-page"
 import ScheduleDetailPage from "@/pages/schedule-detail-page"
 import SchedulesPage from "@/pages/schedules-page"
 import TriggerDetailPage from "@/pages/trigger-detail-page"
+import AgentsPage from "@/pages/agents-page"
 import TriggersPage from "@/pages/triggers-page"
 
 const routeHeaderMap = {
@@ -55,6 +57,11 @@ const routeHeaderMap = {
     title: "Schedules",
     subtitle: "Scheduled prompts that run on a cron cadence",
     icon: Calendar03Icon,
+  },
+  "/agents": {
+    title: "Agent",
+    subtitle: "Configure the local CLI agent for triggers and schedules",
+    icon: AiBrain02Icon,
   },
 } as const
 
@@ -302,6 +309,24 @@ function RootLayout() {
                   </Button>
                 </ButtonGroup>
               )}
+              {pathname === "/agents" && (
+                <ButtonGroup>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:edit-agent"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-agent"))}
+                    className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                  >
+                    Delete
+                  </Button>
+                </ButtonGroup>
+              )}
               {pathname === "/" && (
                 <>
                   <Button
@@ -364,6 +389,12 @@ const triggerDetailRoute = createRoute({
   component: TriggerDetailPage,
 })
 
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents",
+  component: AgentsPage,
+})
+
 const schedulesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/schedules",
@@ -384,6 +415,7 @@ const routeTree = rootRoute.addChildren([
   triggerDetailRoute,
   schedulesRoute,
   scheduleDetailRoute,
+  agentsRoute,
 ])
 
 export const router = createRouter({

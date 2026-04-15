@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Link, useRouterState } from "@tanstack/react-router"
-import { GithubIcon, Settings01Icon } from "@hugeicons/core-free-icons"
+import { Alert02Icon, GithubIcon, Settings01Icon } from "@hugeicons/core-free-icons"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
 import {
@@ -17,7 +17,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
-import { getSchedules, getTriggers } from "@/lib/relay-api"
+import { getAgent, getSchedules, getTriggers } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
@@ -28,6 +28,7 @@ function AppSidebar() {
 
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   const [scheduleCount, setScheduleCount] = useState<number | null>(null)
+  const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -41,6 +42,11 @@ function AppSidebar() {
         if (!cancelled) setScheduleCount(data.length)
       })
       .catch(() => {})
+    getAgent()
+      .then((data) => {
+        if (!cancelled) setAgentConfigured(data !== null)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -51,9 +57,10 @@ function AppSidebar() {
       workspaceNavigation.map((item) => {
         if (item.title === "Triggers" && triggerCount !== null) return { ...item, count: String(triggerCount) }
         if (item.title === "Schedules" && scheduleCount !== null) return { ...item, count: String(scheduleCount) }
+        if (item.title === "Agents" && agentConfigured === false) return { ...item, warning: true }
         return item
       }),
-    [triggerCount, scheduleCount],
+    [triggerCount, scheduleCount, agentConfigured],
   )
 
   return (
@@ -116,7 +123,11 @@ function AppSidebar() {
                   >
                     <HugeIcon icon={item.icon} size={16} className="text-white/50 data-[active=true]:text-white" />
                     <span>{item.title}</span>
-                    {item.count ? (
+                    {item.warning ? (
+                      <span className="ml-auto text-amber-400" title="No agent configured">
+                        <HugeIcon icon={Alert02Icon} size={14} />
+                      </span>
+                    ) : item.count ? (
                       <span className="ml-auto text-[11px] tabular-nums text-white/40">{item.count}</span>
                     ) : null}
                   </SidebarMenuButton>

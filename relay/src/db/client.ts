@@ -104,6 +104,16 @@ function createDatabase(databasePath: string) {
       finished_at TEXT,
       result_message TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS agent (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      command TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_used_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `)
 
   const repoColumns = sqlite.pragma("table_info(github_repositories)") as { name: string }[]

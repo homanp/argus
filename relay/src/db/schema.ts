@@ -92,7 +92,17 @@ const scheduleExecutions = sqliteTable("schedule_executions", {
   resultMessage: text("result_message"),
 })
 
+const agent = sqliteTable("agent", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  command: text("command").notNull(),
+  status: text("status").notNull().default("active"),
+  lastUsedAt: text("last_used_at"),
+  ...timestamps,
+})
+
 export {
+  agent,
   githubRepositories,
   githubWebhookEvents,
   integrations,

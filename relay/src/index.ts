@@ -6,8 +6,10 @@ import dotenv from "dotenv"
 import express from "express"
 import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
+import { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, runAgent } from "./agent.js"
 import { createDatabase } from "./db/client.js"
 import {
+  agent as agentTable,
   githubRepositories,
   githubWebhookEvents,
   integrations,
@@ -736,6 +738,23 @@ async function evaluateTriggers(
         matchedAt: timestamp,
       })
       fired += 1
+
+      if (trigger.actionPrompt) {
+        const configured = getConfiguredAgent(db)
+        if (configured && configured.status === "active") {
+          runAgent(configured.command, trigger.actionPrompt)
+            .then((result) => {
+              db.update(agentTable)
+                .set({ lastUsedAt: now(), updatedAt: now() })
+                .where(eq(agentTable.id, "default"))
+                .run()
+              console.log(`[agent] trigger "${trigger.name}" → exit ${result.exitCode}`)
+            })
+            .catch((err) => {
+              console.error(`[agent] trigger "${trigger.name}" failed:`, err)
+            })
+        }
+      }
     }
   }
 
@@ -1415,6 +1434,82 @@ app.get("/api/schedules/:scheduleId/executions", async (request, response) => {
       resultMessage: row.resultMessage ?? null,
     })),
   })
+})
+
+// ── Agent routes ──
+
+app.get("/api/agent", async (_request, response) => {
+  const configured = getConfiguredAgent(db)
+  response.json(configured)
+})
+
+app.post("/api/agent", express.json(), async (request, response) => {
+  const { name, command } = request.body as { name?: string; command?: string }
+
+  if (!name || !command) {
+    response.status(400).json({ error: "Both name and command are required." })
+    return
+  }
+
+  const timestamp = now()
+
+  db.insert(agentTable)
+    .values({ id: "default", name, command, status: "active", createdAt: timestamp, updatedAt: timestamp })
+    .onConflictDoUpdate({
+      target: agentTable.id,
+      set: { name, command, status: "active", updatedAt: timestamp },
+    })
+    .run()
+
+  const configured = getConfiguredAgent(db)
+  response.json(configured)
+})
+
+app.delete("/api/agent", async (_request, response) => {
+  db.delete(agentTable).where(eq(agentTable.id, "default")).run()
+  response.json({ ok: true })
+})
+
+app.get("/api/agent/detect", async (_request, response) => {
+  const agents = await detectInstalledAgents()
+  response.json(agents)
+})
+
+app.post("/api/agent/test", async (_request, response) => {
+  const configured = getConfiguredAgent(db)
+
+  if (!configured) {
+    response.status(400).json({ error: "No agent configured." })
+    return
+  }
+
+  if (configured.status !== "active") {
+    response.status(400).json({ error: "Agent is not active." })
+    return
+  }
+
+  const result = await runAgent(configured.command, "Respond with exactly: hello")
+
+  db.update(agentTable).set({ lastUsedAt: now(), updatedAt: now() }).where(eq(agentTable.id, "default")).run()
+
+  response.json(result)
+})
+
+app.get("/api/agent/check-skill", async (_request, response) => {
+  const configured = getConfiguredAgent(db)
+
+  if (!configured) {
+    response.status(400).json({ error: "No agent configured." })
+    return
+  }
+
+  const result = checkSkillInstalled(configured.name)
+  response.json(result)
+})
+
+app.get("/api/agent/check-cli", async (_request, response) => {
+  const result = await checkCliInstalled()
+  response.json(result)
 })
 
 let schedulerTimer: ReturnType<typeof setInterval> | null = null

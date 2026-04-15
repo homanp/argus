@@ -185,15 +185,49 @@ npm run tauri dev
    - choose which events to subscribe to
 7. click **test webhook** to verify the local path works, then push a commit or open a PR to see real events flow through
 
+### connect your coding agent
+
+argus dispatches prompts to a local coding agent CLI when triggers fire or schedules tick. you need at least one agent CLI installed on your machine.
+
+**supported agents:**
+
+| agent                                                         | install                                    |
+| ------------------------------------------------------------- | ------------------------------------------ | ----- |
+| [claude code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
+| [codex](https://github.com/openai/codex)                      | `npm install -g @openai/codex`             |
+| [gemini cli](https://github.com/google-gemini/gemini-cli)     | `npm install -g @google/gemini-cli`        |
+| [cursor](https://www.cursor.com/docs/cli/overview)            | included with Cursor desktop app           |
+| [opencode](https://opencode.ai)                               | `curl -fsSL https://opencode.ai/install    | bash` |
+
+once installed, open the app and navigate to **agents**. argus auto-detects which CLIs are available on your machine. pick one or enter a custom command manually, then hit **test** to verify it works.
+
+**install the argus skill (coming soon):**
+
+the argus skill gives your coding agent direct context about your triggers, schedules, and events. install it with [skills.sh](https://skills.sh):
+
+```bash
+npx skills add argus-ai/argus
+```
+
+**install the argus cli (coming soon):**
+
+the argus CLI lets you manage connectors, triggers, schedules, and your agent configuration from the terminal without opening the desktop app:
+
+```bash
+curl -fsSL https://argus.dev/install | bash
+```
+
 ### relay architecture
 
 ```
 relay/
 ├── src/
 │   ├── index.ts          # express server, API routes, webhook receiver
+│   ├── agent.ts           # agent detection, configuration, and CLI runner
+│   ├── scheduler.ts       # cron scheduler for scheduled prompts
 │   ├── tunnel.ts          # auto-starts a cloudflare tunnel on boot
 │   └── db/
-│       ├── schema.ts      # drizzle ORM schema (integrations, repos, events)
+│       ├── schema.ts      # drizzle ORM schema (integrations, repos, events, agent)
 │       └── client.ts      # SQLite connection via better-sqlite3
 ├── data/
 │   └── relay.db           # local SQLite database (auto-created)

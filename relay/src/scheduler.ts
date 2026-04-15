@@ -2,8 +2,9 @@ import { eq, and, lte } from "drizzle-orm"
 import { CronExpressionParser } from "cron-parser"
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 
+import { getConfiguredAgent, runAgent } from "./agent.js"
 import type * as schema from "./db/schema.js"
-import { schedules, scheduleExecutions } from "./db/schema.js"
+import { agent as agentTable, schedules, scheduleExecutions } from "./db/schema.js"
 
 type DB = BetterSQLite3Database<typeof schema>
 type ScheduleRow = typeof schedules.$inferSelect
@@ -58,16 +59,6 @@ function tick(db: DB) {
 
   for (const schedule of dueSchedules) {
     try {
-      db.insert(scheduleExecutions)
-        .values({
-          scheduleId: schedule.id,
-          status: "completed",
-          startedAt: timestamp,
-          finishedAt: timestamp,
-          resultMessage: `Scheduled prompt ready: ${schedule.prompt.slice(0, 200)}`,
-        })
-        .run()
-
       const nextRunAt = computeNextRunAt(schedule.cronExpression, schedule.timezone, new Date(timestamp))
 
       db.update(schedules)
@@ -75,7 +66,59 @@ function tick(db: DB) {
         .where(eq(schedules.id, schedule.id))
         .run()
 
-      console.log(`Schedule "${schedule.name}" fired`)
+      const configured = getConfiguredAgent(db)
+
+      if (configured && configured.status === "active") {
+        const [execution] = db
+          .insert(scheduleExecutions)
+          .values({ scheduleId: schedule.id, status: "running", startedAt: timestamp })
+          .returning()
+          .all()
+
+        console.log(`Schedule "${schedule.name}" fired → dispatching to agent`)
+
+        runAgent(configured.command, schedule.prompt)
+          .then((result) => {
+            const finished = new Date().toISOString()
+            const status = result.exitCode === 0 ? "completed" : "failed"
+            const resultMessage = result.stdout || result.stderr || `exit ${result.exitCode}`
+
+            db.update(scheduleExecutions)
+              .set({ status, finishedAt: finished, resultMessage: resultMessage.slice(0, 4000) })
+              .where(eq(scheduleExecutions.id, execution.id))
+              .run()
+
+            db.update(agentTable)
+              .set({ lastUsedAt: finished, updatedAt: finished })
+              .where(eq(agentTable.id, "default"))
+              .run()
+
+            console.log(`[agent] schedule "${schedule.name}" → exit ${result.exitCode}`)
+          })
+          .catch((err) => {
+            const finished = new Date().toISOString()
+            const message = err instanceof Error ? err.message : String(err)
+
+            db.update(scheduleExecutions)
+              .set({ status: "failed", finishedAt: finished, resultMessage: message })
+              .where(eq(scheduleExecutions.id, execution.id))
+              .run()
+
+            console.error(`[agent] schedule "${schedule.name}" failed:`, message)
+          })
+      } else {
+        db.insert(scheduleExecutions)
+          .values({
+            scheduleId: schedule.id,
+            status: "completed",
+            startedAt: timestamp,
+            finishedAt: timestamp,
+            resultMessage: `Scheduled prompt ready: ${schedule.prompt.slice(0, 200)}`,
+          })
+          .run()
+
+        console.log(`Schedule "${schedule.name}" fired (no agent configured)`)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error(`Schedule "${schedule.name}" failed: ${message}`)
