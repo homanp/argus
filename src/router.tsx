@@ -27,7 +27,7 @@ import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
@@ -103,7 +103,7 @@ function RootLayout() {
     <div className="relative min-h-svh">
       <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-40 h-8" />
       <SidebarProvider
-        defaultOpen
+        defaultOpen={false}
         className="min-h-svh flex-1"
         style={
           {
@@ -116,7 +116,6 @@ function RootLayout() {
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent pt-0">
           <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
             <div className="flex min-w-0 items-center gap-2">
-              <SidebarTrigger className="size-6 rounded-sm p-0 text-white/35 hover:bg-white/[0.03] hover:text-white/70 md:hidden" />
               {providerTitle || isTriggersDetail || isSchedulesDetail ? (
                 <Link
                   to={isSchedulesDetail ? "/schedules" : isTriggersDetail ? "/triggers" : "/connectors"}

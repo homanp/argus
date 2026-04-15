@@ -65,8 +65,8 @@ function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-white/8 pt-9">
-      <SidebarContent className="px-2.5 pt-1 pb-2">
-        <SidebarGroup className="px-0 pt-0">
+      <SidebarContent className="pt-1 pb-2">
+        <SidebarGroup className="pt-0">
           <SidebarMenu>
             {primaryNavigation.map((item) => (
               <SidebarMenuItem key={item.title}>
@@ -107,8 +107,9 @@ function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup className="px-0 pt-1">
-          <SidebarGroupLabel className="px-3 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
+        <SidebarGroup className="pt-1">
+          <div className="mx-2 mb-1 hidden border-t border-white/8 group-data-[collapsible=icon]:block" />
+          <SidebarGroupLabel className="px-1 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
             Workspace
           </SidebarGroupLabel>
           <SidebarMenu>
@@ -124,7 +125,10 @@ function AppSidebar() {
                     <HugeIcon icon={item.icon} size={16} className="text-white/50 data-[active=true]:text-white" />
                     <span>{item.title}</span>
                     {item.warning ? (
-                      <span className="ml-auto text-amber-400" title="No agent configured">
+                      <span
+                        className="ml-auto text-amber-400 group-data-[collapsible=icon]:hidden"
+                        title="No agent configured"
+                      >
                         <HugeIcon icon={Alert02Icon} size={14} />
                       </span>
                     ) : item.count ? (
@@ -148,8 +152,9 @@ function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup className="px-0 pt-1">
-          <SidebarGroupLabel className="px-3 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
+        <SidebarGroup className="pt-1">
+          <div className="mx-2 mb-1 hidden border-t border-white/8 group-data-[collapsible=icon]:block" />
+          <SidebarGroupLabel className="px-1 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
             Open tasks
           </SidebarGroupLabel>
           <SidebarMenu>
@@ -166,11 +171,11 @@ function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="px-3 pb-3 pt-2">
-        <div className="flex items-center justify-between px-1 group-data-[collapsible=icon]:justify-center">
+        <div className="flex items-center justify-between px-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1">
           <span className="text-[11px] text-white/30 group-data-[collapsible=icon]:hidden">
             Argus <span className="text-white/20">v0.1.0-alpha</span>
           </span>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5 group-data-[collapsible=icon]:flex-col">
             <button className="flex size-6 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/60">
               <HugeIcon icon={GithubIcon} size={14} />
             </button>
