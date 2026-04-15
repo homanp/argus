@@ -14,7 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarResizeHandle,
 } from "@/components/ui/sidebar"
 import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
 import { getAgent, getSchedules, getTriggers } from "@/lib/relay-api"
@@ -64,7 +64,7 @@ function AppSidebar() {
   )
 
   return (
-    <Sidebar collapsible="icon" className="border-white/8 pt-9">
+    <Sidebar className="border-white/8 pt-9">
       <SidebarContent className="pt-1 pb-2">
         <SidebarGroup className="pt-0">
           <SidebarMenu>
@@ -108,7 +108,6 @@ function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="pt-1">
-          <div className="mx-2 mb-1 hidden border-t border-white/8 group-data-[collapsible=icon]:block" />
           <SidebarGroupLabel className="px-1 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
             Workspace
           </SidebarGroupLabel>
@@ -125,10 +124,7 @@ function AppSidebar() {
                     <HugeIcon icon={item.icon} size={16} className="text-white/50 data-[active=true]:text-white" />
                     <span>{item.title}</span>
                     {item.warning ? (
-                      <span
-                        className="ml-auto text-amber-400 group-data-[collapsible=icon]:hidden"
-                        title="No agent configured"
-                      >
+                      <span className="ml-auto text-amber-400" title="No agent configured">
                         <HugeIcon icon={Alert02Icon} size={14} />
                       </span>
                     ) : item.count ? (
@@ -153,7 +149,6 @@ function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="pt-1">
-          <div className="mx-2 mb-1 hidden border-t border-white/8 group-data-[collapsible=icon]:block" />
           <SidebarGroupLabel className="px-1 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
             Open tasks
           </SidebarGroupLabel>
@@ -171,11 +166,11 @@ function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="px-3 pb-3 pt-2">
-        <div className="flex items-center justify-between px-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1">
-          <span className="text-[11px] text-white/30 group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] text-white/30">
             Argus <span className="text-white/20">v0.1.0-alpha</span>
           </span>
-          <div className="flex items-center gap-0.5 group-data-[collapsible=icon]:flex-col">
+          <div className="flex items-center gap-0.5">
             <button className="flex size-6 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/60">
               <HugeIcon icon={GithubIcon} size={14} />
             </button>
@@ -186,7 +181,7 @@ function AppSidebar() {
         </div>
       </SidebarFooter>
 
-      <SidebarRail />
+      <SidebarResizeHandle />
     </Sidebar>
   )
 }

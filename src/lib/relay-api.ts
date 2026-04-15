@@ -69,6 +69,9 @@ type TriggerExecution = {
   id: number
   matchedAt: string
   webhookEventId: number
+  status: string
+  finishedAt: string | null
+  resultMessage: string | null
   eventType: string | null
   repositoryId: string | null
   payload: Record<string, unknown> | null

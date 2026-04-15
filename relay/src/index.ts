@@ -712,6 +712,26 @@ function evaluateConditions(payload: Record<string, unknown>, conditions: Trigge
   return true
 }
 
+function buildTriggerContext(
+  trigger: TriggerRow,
+  provider: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+): string {
+  const lines = [
+    `[Trigger: ${trigger.name}]`,
+    `Source: ${provider}`,
+    `Event: ${eventType}`,
+    ``,
+    `[Event payload]`,
+    JSON.stringify(payload),
+    ``,
+    `[Task]`,
+    trigger.actionPrompt,
+  ]
+  return lines.join("\n")
+}
+
 async function evaluateTriggers(
   webhookEventId: number,
   provider: string,
@@ -732,25 +752,46 @@ async function evaluateTriggers(
       : []
 
     if (conditions.length === 0 || evaluateConditions(payload, conditions)) {
-      await db.insert(triggerExecutions).values({
-        triggerId: trigger.id,
-        webhookEventId,
-        matchedAt: timestamp,
-      })
+      const [execution] = await db
+        .insert(triggerExecutions)
+        .values({
+          triggerId: trigger.id,
+          webhookEventId,
+          matchedAt: timestamp,
+          status: "matched",
+        })
+        .returning()
+
       fired += 1
 
       if (trigger.actionPrompt) {
         const configured = getConfiguredAgent(db)
         if (configured && configured.status === "active") {
-          runAgent(configured.command, trigger.actionPrompt)
+          db.update(triggerExecutions).set({ status: "running" }).where(eq(triggerExecutions.id, execution.id)).run()
+
+          const enrichedPrompt = buildTriggerContext(trigger, provider, eventType, payload)
+          runAgent(configured.command, enrichedPrompt)
             .then((result) => {
+              const finished = new Date().toISOString()
+              const status = result.exitCode === 0 ? "completed" : "failed"
+              const resultMessage = result.stdout || result.stderr || `exit ${result.exitCode}`
+
+              db.update(triggerExecutions)
+                .set({ status, finishedAt: finished, resultMessage: resultMessage.slice(0, 4000) })
+                .where(eq(triggerExecutions.id, execution.id))
+                .run()
+
               db.update(agentTable)
-                .set({ lastUsedAt: now(), updatedAt: now() })
+                .set({ lastUsedAt: finished, updatedAt: finished })
                 .where(eq(agentTable.id, "default"))
                 .run()
               console.log(`[agent] trigger "${trigger.name}" → exit ${result.exitCode}`)
             })
             .catch((err) => {
+              db.update(triggerExecutions)
+                .set({ status: "failed", finishedAt: new Date().toISOString(), resultMessage: String(err) })
+                .where(eq(triggerExecutions.id, execution.id))
+                .run()
               console.error(`[agent] trigger "${trigger.name}" failed:`, err)
             })
         }
@@ -1176,6 +1217,9 @@ app.get("/api/triggers/:triggerId/executions", async (request, response) => {
       id: triggerExecutions.id,
       matchedAt: triggerExecutions.matchedAt,
       webhookEventId: triggerExecutions.webhookEventId,
+      status: triggerExecutions.status,
+      finishedAt: triggerExecutions.finishedAt,
+      resultMessage: triggerExecutions.resultMessage,
       eventType: githubWebhookEvents.eventType,
       repositoryId: githubWebhookEvents.repositoryId,
       payloadJson: githubWebhookEvents.payloadJson,
@@ -1201,6 +1245,9 @@ app.get("/api/triggers/:triggerId/executions", async (request, response) => {
       id: row.id,
       matchedAt: row.matchedAt,
       webhookEventId: row.webhookEventId,
+      status: row.status ?? "matched",
+      finishedAt: row.finishedAt ?? null,
+      resultMessage: row.resultMessage ?? null,
       eventType: row.eventType,
       repositoryId: row.repositoryId,
       payload: row.payloadJson ? JSON.parse(row.payloadJson) : null,
