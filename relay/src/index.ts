@@ -1455,9 +1455,11 @@ app.post("/api/triggers", express.json(), async (request, response) => {
     eventType,
     conditionsJson: Array.isArray(conditions) && conditions.length > 0 ? JSON.stringify(conditions) : null,
     actionPrompt: promptValue,
-    channelTargetsJson: Array.isArray(channelTargets)
-      ? JSON.stringify(channelTargets.filter((item: unknown) => typeof item === "string" && isChannelProvider(item)))
-      : null,
+    channelTargetsJson: (() => {
+      if (!Array.isArray(channelTargets)) return null
+      const filtered = channelTargets.filter((item: unknown) => typeof item === "string" && isChannelProvider(item))
+      return filtered.length > 0 ? JSON.stringify(filtered) : null
+    })(),
     enabled: enabled !== false,
     createdAt: timestamp,
     updatedAt: timestamp,

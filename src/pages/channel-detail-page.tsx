@@ -235,31 +235,6 @@ function ChannelDetailPage() {
     }
   }
 
-  useEffect(() => {
-    async function onDelete() {
-      setRemoving(true)
-      setError(null)
-      setNotice(null)
-      try {
-        await removeChannel(provider)
-        const state = await getChannel(provider)
-        setChannelState(state)
-        setFormValues({})
-        syncNavbarBadge(state.status)
-        setNotice(`${channel.title} configuration cleared.`)
-      } catch (removeError) {
-        setError(removeError instanceof Error ? removeError.message : "Failed to remove channel.")
-      } finally {
-        setRemoving(false)
-      }
-    }
-
-    window.addEventListener("argus:delete-channel", onDelete as EventListener)
-    return () => {
-      window.removeEventListener("argus:delete-channel", onDelete as EventListener)
-    }
-  }, [provider, channel.title])
-
   return (
     <section className="px-5 py-5 md:px-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
