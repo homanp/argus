@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { Calendar03Icon, Loading03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
 import { useNavigate } from "@tanstack/react-router"
 
+import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { TogglePill } from "@/components/ui/toggle-pill"
@@ -222,9 +223,9 @@ function SchedulesPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="inline-block rounded border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+                      <Badge variant="violet" size="sm">
                         {humanCron(schedule.cronExpression)}
-                      </span>
+                      </Badge>
                       {schedule.timezone !== "UTC" && (
                         <span className="ml-1.5 text-[10px] text-white/25">{schedule.timezone}</span>
                       )}

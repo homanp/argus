@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { TogglePill } from "@/components/ui/toggle-pill"
-import { createTrigger, updateTrigger, type Trigger, type TriggerCondition } from "@/lib/relay-api"
+import { channelCatalog } from "@/lib/channel-catalog"
+import { createTrigger, updateTrigger, type ChannelState, type Trigger, type TriggerCondition } from "@/lib/relay-api"
+import { cn } from "@/lib/utils"
 
 const PROVIDER_OPTIONS = [{ value: "github", label: "GitHub", icon: Github01Icon }]
 const OPERATOR_OPTIONS: { value: TriggerCondition["operator"]; label: string }[] = [
@@ -67,6 +69,7 @@ function TriggerSheet({
   availableEvents,
   eventsSource,
   onSaved,
+  availableChannels,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -74,12 +77,14 @@ function TriggerSheet({
   availableEvents: string[]
   eventsSource: string
   onSaved: () => void
+  availableChannels: ChannelState[]
 }) {
   const [name, setName] = useState("")
   const [provider, setProvider] = useState("github")
   const [eventType, setEventType] = useState("")
   const [conditions, setConditions] = useState<TriggerCondition[]>([])
   const [actionPrompt, setActionPrompt] = useState("")
+  const [channelTargets, setChannelTargets] = useState<ChannelState["provider"][]>([])
   const [enabled, setEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -90,6 +95,7 @@ function TriggerSheet({
       setEventType(editingTrigger.eventType)
       setConditions(editingTrigger.conditions)
       setActionPrompt(editingTrigger.actionPrompt ?? "")
+      setChannelTargets(editingTrigger.channelTargets)
       setEnabled(editingTrigger.enabled)
     } else {
       setName("")
@@ -97,6 +103,7 @@ function TriggerSheet({
       setEventType("")
       setConditions([])
       setActionPrompt("")
+      setChannelTargets([])
       setEnabled(true)
     }
   }, [editingTrigger, open])
@@ -107,9 +114,17 @@ function TriggerSheet({
 
     try {
       if (editingTrigger) {
-        await updateTrigger(editingTrigger.id, { name, provider, eventType, conditions, actionPrompt, enabled })
+        await updateTrigger(editingTrigger.id, {
+          name,
+          provider,
+          eventType,
+          conditions,
+          actionPrompt,
+          channelTargets,
+          enabled,
+        })
       } else {
-        await createTrigger({ name, provider, eventType, conditions, actionPrompt, enabled })
+        await createTrigger({ name, provider, eventType, conditions, actionPrompt, channelTargets, enabled })
       }
       onSaved()
       onOpenChange(false)
@@ -129,6 +144,12 @@ function TriggerSheet({
   function removeCondition(index: number) {
     setConditions((prev) => prev.filter((_, i) => i !== index))
   }
+
+  function toggleChannelTarget(target: ChannelState["provider"]) {
+    setChannelTargets((prev) => (prev.includes(target) ? prev.filter((item) => item !== target) : [...prev, target]))
+  }
+
+  const connectedChannels = availableChannels.filter((channel) => channel.status === "connected")
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -231,6 +252,51 @@ function TriggerSheet({
             <p className="text-[11px] text-white/30">
               Plain English instruction for the agent. Used when agents are connected.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[12px] font-medium text-white/60">
+              Channels <span className="text-white/30">(optional)</span>
+            </label>
+            {connectedChannels.length > 0 ? (
+              <div className="space-y-2">
+                {connectedChannels.map((channel) => (
+                  <label
+                    key={channel.provider}
+                    className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.02] px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/8">
+                        {(() => {
+                          const meta = channelCatalog.find((item) => item.provider === channel.provider)
+                          return meta?.image ? (
+                            <img
+                              src={meta.image}
+                              alt={channel.displayName}
+                              className={cn("size-4 object-contain", meta.imageClassName?.replace("size-5", "size-4"))}
+                            />
+                          ) : meta ? (
+                            <HugeIcon icon={meta.icon} size={14} className="text-white/60" />
+                          ) : null
+                        })()}
+                      </div>
+                      <div>
+                        <p className="text-[12px] text-white/70">{channel.displayName}</p>
+                        <p className="text-[11px] text-white/30">Configured and ready to send.</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={channelTargets.includes(channel.provider)}
+                      onChange={() => toggleChannelTarget(channel.provider)}
+                      className="size-3.5 rounded border-white/15 bg-transparent accent-violet-300"
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-white/30">Connect a channel first to enable outbound delivery.</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

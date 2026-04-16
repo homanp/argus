@@ -4,15 +4,18 @@ import { Loading03Icon, MoreHorizontalIcon, ZapIcon } from "@hugeicons/core-free
 import { useNavigate } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TogglePill } from "@/components/ui/toggle-pill"
 import { TriggerSheet } from "@/components/trigger-sheet"
 import {
   deleteTrigger,
+  getChannels,
   getGitHubAvailableEvents,
   getTriggers,
   updateTrigger,
   type AvailableEventsResponse,
+  type ChannelState,
   type Trigger,
 } from "@/lib/relay-api"
 import { integrationCatalog } from "@/lib/integration-catalog"
@@ -105,6 +108,7 @@ function TriggersPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingTrigger, setEditingTrigger] = useState<Trigger | null>(null)
   const [availableEvents, setAvailableEvents] = useState<string[]>([])
+  const [availableChannels, setAvailableChannels] = useState<ChannelState[]>([])
   const [eventsSource, setEventsSource] = useState<string>("static_fallback")
 
   const loadTriggers = useCallback(async () => {
@@ -129,9 +133,16 @@ function TriggersPage() {
       })
   }
 
+  function loadChannels() {
+    getChannels()
+      .then((data) => setAvailableChannels(data))
+      .catch(() => {})
+  }
+
   function openCreateSheet() {
     setEditingTrigger(null)
     loadEvents()
+    loadChannels()
     setSheetOpen(true)
   }
 
@@ -140,6 +151,7 @@ function TriggersPage() {
 
   useEffect(() => {
     void loadTriggers()
+    loadChannels()
   }, [loadTriggers])
 
   useEffect(() => {
@@ -172,6 +184,7 @@ function TriggersPage() {
   function openEditSheet(trigger: Trigger) {
     setEditingTrigger(trigger)
     void loadEvents()
+    loadChannels()
     setSheetOpen(true)
   }
 
@@ -259,19 +272,30 @@ function TriggersPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="inline-block rounded border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+                      <Badge variant="violet" size="sm">
                         {formatEventType(trigger.eventType)}
-                      </span>
+                      </Badge>
                       {trigger.conditions.length > 0 && (
                         <span className="ml-1.5 text-[10px] text-white/25">+{trigger.conditions.length}</span>
                       )}
                     </td>
                     <td className="hidden max-w-[260px] px-3 py-2 lg:table-cell">
-                      {trigger.actionPrompt ? (
-                        <p className="line-clamp-1 text-[12px] text-white/35">{trigger.actionPrompt}</p>
-                      ) : (
-                        <span className="text-[11px] text-white/15">—</span>
-                      )}
+                      <div className="space-y-1">
+                        {trigger.actionPrompt ? (
+                          <p className="line-clamp-1 text-[12px] text-white/35">{trigger.actionPrompt}</p>
+                        ) : (
+                          <span className="text-[11px] text-white/15">—</span>
+                        )}
+                        {trigger.channelTargets.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {trigger.channelTargets.map((target) => (
+                              <Badge key={target} size="sm">
+                                {target}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-right text-[12px] tabular-nums text-white/35">
                       {trigger.executionCount > 0 ? (
@@ -313,6 +337,7 @@ function TriggersPage() {
           onOpenChange={setSheetOpen}
           editingTrigger={editingTrigger}
           availableEvents={availableEvents}
+          availableChannels={availableChannels}
           eventsSource={eventsSource}
           onSaved={() => void loadTriggers()}
         />

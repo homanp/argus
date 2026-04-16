@@ -1,5 +1,6 @@
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
+import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -34,17 +35,17 @@ function DecisionCard({ card }: { card: DecisionCardData }) {
     >
       <CardContent className="space-y-5 px-5 py-5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
-          <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-white/80">
+          <Badge variant="subtle" size="md" className="text-white/80">
             <HugeIcon icon={card.sourceIcon} size={14} className="text-white/60" />
             <span className="font-medium text-white">{card.source}</span>
             <span className="text-white/35">{card.event}</span>
-          </div>
+          </Badge>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.04] px-2 py-1">
+            <Badge variant="subtle" size="md">
               <HugeIcon icon={card.channelIcon} size={12} className="text-white/60" />
               <span>{card.channel}</span>
-            </div>
+            </Badge>
             <span>{card.taskId}</span>
             <span>{card.time}</span>
           </div>
@@ -69,14 +70,9 @@ function DecisionCard({ card }: { card: DecisionCardData }) {
               <span>
                 {card.confidence.toFixed(2)} · {card.confidenceLabel}
               </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full border border-violet-300/20 bg-violet-300/[0.10] px-2 py-1 text-violet-50",
-                  card.agentToneClassName,
-                )}
-              >
+              <Badge variant="violet" size="md" className={cn("text-violet-50", card.agentToneClassName)}>
                 {card.agent}
-              </span>
+              </Badge>
             </div>
           </div>
         </div>
@@ -84,21 +80,27 @@ function DecisionCard({ card }: { card: DecisionCardData }) {
         <div className="flex flex-wrap items-center gap-2">
           <Button className="h-8 rounded-lg bg-violet-300 px-3 text-[12px] font-semibold text-violet-950 hover:bg-violet-200">
             {card.actions[0]}
-            <span className="ml-1 rounded-md bg-black/12 px-1.5 py-0.5 text-[10px] text-black/65">1</span>
+            <Badge size="sm" className="ml-1 border-transparent bg-black/12 text-black/65">
+              1
+            </Badge>
           </Button>
           <Button
             variant="outline"
             className="h-8 rounded-lg border-white/10 bg-transparent px-3 text-[12px] text-white/72 hover:bg-white/[0.04] hover:text-white"
           >
             {card.actions[1]}
-            <span className="ml-1 rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/50">2</span>
+            <Badge size="sm" className="ml-1 border-transparent bg-white/[0.06] text-white/50">
+              2
+            </Badge>
           </Button>
           <Button
             variant="outline"
             className="h-8 rounded-lg border-white/10 bg-transparent px-3 text-[12px] text-white/72 hover:bg-white/[0.04] hover:text-white"
           >
             {card.actions[2]}
-            <span className="ml-1 rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/50">3</span>
+            <Badge size="sm" className="ml-1 border-transparent bg-white/[0.06] text-white/50">
+              3
+            </Badge>
           </Button>
 
           <div className="ml-auto">

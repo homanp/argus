@@ -93,7 +93,8 @@ const workspaceNavigation: NavigationItem[] = [
   {
     title: "Channels",
     icon: Notification03Icon,
-    count: "6",
+    count: "4",
+    href: "/channels",
   },
   {
     title: "Schedules",

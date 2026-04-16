@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { useRouterState } from "@tanstack/react-router"
 
+import { Badge, badgeVariants } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,11 +42,11 @@ function buildEmptyGitHubState(): GitHubIntegrationState {
 function statusBadgeClasses(status: string) {
   switch (status) {
     case "connected":
-      return "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+      return badgeVariants({ size: "sm", variant: "success" })
     case "error":
-      return "border-rose-300/20 bg-rose-300/10 text-rose-200"
+      return badgeVariants({ size: "sm", variant: "danger" })
     default:
-      return "border-white/10 bg-white/[0.04] text-white/40"
+      return badgeVariants({ size: "sm", variant: "neutral" })
   }
 }
 
@@ -54,11 +55,11 @@ function webhookStatusBadge(status: string) {
     case "active":
     case "test_passed":
     case "ready":
-      return "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+      return badgeVariants({ size: "sm", variant: "success" })
     case "not_configured":
-      return "border-white/10 bg-white/[0.04] text-white/50"
+      return badgeVariants({ size: "sm", variant: "neutral" })
     default:
-      return "border-white/10 bg-white/[0.04] text-white/50"
+      return badgeVariants({ size: "sm", variant: "neutral" })
   }
 }
 
@@ -134,9 +135,7 @@ function ExpandableRepoRow({
           </div>
           <div className="flex items-center gap-2">
             {repository.selected && (
-              <span
-                className={`rounded-full border px-1.5 py-px text-[10px] ${webhookStatusBadge(repository.webhookStatus)}`}
-              >
+              <span className={webhookStatusBadge(repository.webhookStatus)}>
                 {capitalize(repository.webhookStatus.replaceAll("_", " "))}
               </span>
             )}
@@ -243,7 +242,7 @@ function IntegrationDetailPage() {
     if (!badge) return
     const label = capitalize(status.replaceAll("_", " "))
     badge.textContent = label
-    badge.className = `ml-1 rounded-full border px-1.5 py-0.5 text-[10px] ${statusBadgeClasses(status)}`
+    badge.className = `ml-1 ${statusBadgeClasses(status)}`
   }
 
   useEffect(() => {
@@ -456,9 +455,9 @@ function IntegrationDetailPage() {
                   <p className="text-[12px] text-white/40">Select a repo to enable webhooks.</p>
                 </div>
                 {selectedCount > 0 && (
-                  <span className="shrink-0 rounded-full border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+                  <Badge variant="violet" size="sm" className="shrink-0">
                     {selectedCount} Active
-                  </span>
+                  </Badge>
                 )}
               </div>
               <div className="border-b border-white/5 px-4 py-2.5">

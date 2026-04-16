@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { useNavigate } from "@tanstack/react-router"
 
+import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import { getGitHubIntegration, RELAY_BASE_URL, type GitHubIntegrationState } from "@/lib/relay-api"
@@ -91,13 +92,9 @@ function IntegrationsPage() {
 
                 <div className="flex shrink-0 items-center gap-2">
                   {status === "connected" ? (
-                    <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[11px] text-emerald-200">
-                      Connected
-                    </span>
+                    <Badge variant="success">Connected</Badge>
                   ) : status === "error" ? (
-                    <span className="rounded-full border border-rose-300/20 bg-rose-300/10 px-2 py-0.5 text-[11px] text-rose-200">
-                      Error
-                    </span>
+                    <Badge variant="danger">Error</Badge>
                   ) : integration.available ? (
                     <span className="text-[12px] text-white/40">Connect</span>
                   ) : (
