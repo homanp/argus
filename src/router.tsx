@@ -13,6 +13,7 @@ import {
   ArrowLeft02Icon,
   Calendar03Icon,
   ConnectIcon,
+  Notification03Icon,
   Search01Icon,
   ZapIcon,
 } from "@hugeicons/core-free-icons"
@@ -21,13 +22,17 @@ import { Link } from "@tanstack/react-router"
 
 import App from "@/App"
 import { AppSidebar } from "@/components/app-sidebar"
+import { badgeVariants } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
+import { channelCatalog } from "@/lib/channel-catalog"
 import { integrationCatalog } from "@/lib/integration-catalog"
+import ChannelDetailPage from "@/pages/channel-detail-page"
+import ChannelsPage from "@/pages/channels-page"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
 import IntegrationsPage from "@/pages/integrations-page"
 import ScheduleDetailPage from "@/pages/schedule-detail-page"
@@ -51,6 +56,11 @@ const routeHeaderMap = {
     subtitle: "Reactive rules for incoming webhook events",
     icon: ZapIcon,
   },
+  "/channels": {
+    title: "Channels",
+    subtitle: "Outbound destinations for direct Argus notifications",
+    icon: Notification03Icon,
+  },
   "/schedules": {
     title: "Schedules",
     subtitle: "Scheduled prompts that run on a cron cadence",
@@ -70,6 +80,8 @@ function RootLayout() {
   const isConnectorsRoute = pathname === "/connectors" || pathname.startsWith("/connectors/")
   const isTriggersRoute = pathname === "/triggers" || pathname.startsWith("/triggers/")
   const isTriggersDetail = pathname.startsWith("/triggers/") && pathname !== "/triggers"
+  const isChannelsRoute = pathname === "/channels" || pathname.startsWith("/channels/")
+  const isChannelsDetail = pathname.startsWith("/channels/") && pathname !== "/channels"
   const isSchedulesRoute = pathname === "/schedules" || pathname.startsWith("/schedules/")
   const isSchedulesDetail = pathname.startsWith("/schedules/") && pathname !== "/schedules"
   const header = pathname.startsWith("/connectors/")
@@ -78,23 +90,34 @@ function RootLayout() {
         subtitle: "Setup, webhook configuration, and testing",
         icon: ConnectIcon,
       }
-    : isTriggersDetail
+    : pathname.startsWith("/channels/")
       ? {
-          title: "Trigger detail",
-          subtitle: "Configuration and execution history",
-          icon: ZapIcon,
+          title: "Channel detail",
+          subtitle: "Credentials and outbound delivery destination setup",
+          icon: Notification03Icon,
         }
-      : isSchedulesDetail
+      : isTriggersDetail
         ? {
-            title: "Schedule detail",
+            title: "Trigger detail",
             subtitle: "Configuration and execution history",
-            icon: Calendar03Icon,
+            icon: ZapIcon,
           }
-        : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
+        : isSchedulesDetail
+          ? {
+              title: "Schedule detail",
+              subtitle: "Configuration and execution history",
+              icon: Calendar03Icon,
+            }
+          : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
 
-  const providerSlug = pathname.startsWith("/connectors/") ? pathname.split("/").filter(Boolean)[1] : null
+  const providerSlug =
+    pathname.startsWith("/connectors/") || pathname.startsWith("/channels/")
+      ? pathname.split("/").filter(Boolean)[1]
+      : null
   const providerTitle = providerSlug
-    ? (integrationCatalog.find((item) => item.provider === providerSlug)?.title ?? providerSlug)
+    ? pathname.startsWith("/channels/")
+      ? (channelCatalog.find((item) => item.provider === providerSlug)?.title ?? providerSlug)
+      : (integrationCatalog.find((item) => item.provider === providerSlug)?.title ?? providerSlug)
     : null
 
   return (
@@ -107,7 +130,15 @@ function RootLayout() {
             <div className="flex min-w-0 items-center gap-2">
               {providerTitle || isTriggersDetail || isSchedulesDetail ? (
                 <Link
-                  to={isSchedulesDetail ? "/schedules" : isTriggersDetail ? "/triggers" : "/connectors"}
+                  to={
+                    isSchedulesDetail
+                      ? "/schedules"
+                      : isTriggersDetail
+                        ? "/triggers"
+                        : isChannelsDetail
+                          ? "/channels"
+                          : "/connectors"
+                  }
                   className="flex size-6 items-center justify-center rounded-md border border-white/10 text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/80"
                 >
                   <HugeIcon icon={ArrowLeft02Icon} size={14} />
@@ -130,7 +161,26 @@ function RootLayout() {
                         <p className="truncate font-medium text-white">{providerTitle}</p>
                         <span
                           id="connector-status-badge"
-                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                          className={`ml-1 hidden ${badgeVariants({ size: "sm", variant: "neutral" })}`}
+                        />
+                      </>
+                    ) : null}
+                  </>
+                ) : isChannelsRoute ? (
+                  <>
+                    <Link
+                      to="/channels"
+                      className={`font-medium transition-colors ${isChannelsDetail ? "text-white/45 hover:text-white/70" : "text-white"}`}
+                    >
+                      Channels
+                    </Link>
+                    {isChannelsDetail ? (
+                      <>
+                        <span className="text-white/20">/</span>
+                        <p className="truncate font-medium text-white">{providerTitle}</p>
+                        <span
+                          id="channel-status-badge"
+                          className={`ml-1 hidden ${badgeVariants({ size: "sm", variant: "neutral" })}`}
                         />
                       </>
                     ) : null}
@@ -151,7 +201,7 @@ function RootLayout() {
                         </p>
                         <span
                           id="trigger-detail-status"
-                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                          className={`ml-1 hidden ${badgeVariants({ size: "sm", variant: "neutral" })}`}
                         />
                       </>
                     ) : null}
@@ -172,7 +222,7 @@ function RootLayout() {
                         </p>
                         <span
                           id="schedule-detail-status"
-                          className="ml-1 hidden rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40"
+                          className={`ml-1 hidden ${badgeVariants({ size: "sm", variant: "neutral" })}`}
                         />
                       </>
                     ) : null}
@@ -196,6 +246,19 @@ function RootLayout() {
                   />
                   <Input
                     placeholder="Search connectors..."
+                    className="h-7 w-52 rounded-md border-white/8 bg-white/[0.03] pl-8 !text-[12px] text-white/70 placeholder:text-white/30"
+                  />
+                </div>
+              )}
+              {pathname === "/channels" && (
+                <div className="relative">
+                  <HugeIcon
+                    icon={Search01Icon}
+                    size={14}
+                    className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-white/35"
+                  />
+                  <Input
+                    placeholder="Search channels..."
                     className="h-7 w-52 rounded-md border-white/8 bg-white/[0.03] pl-8 !text-[12px] text-white/70 placeholder:text-white/30"
                   />
                 </div>
@@ -225,7 +288,7 @@ function RootLayout() {
                   </Button>
                 </>
               )}
-              {providerTitle && (
+              {providerTitle && pathname.startsWith("/connectors/") && (
                 <Button
                   variant="outline"
                   onClick={() => window.dispatchEvent(new CustomEvent("argus:delete-connector"))}
@@ -371,6 +434,18 @@ const triggersRoute = createRoute({
   component: TriggersPage,
 })
 
+const channelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/channels",
+  component: ChannelsPage,
+})
+
+const channelDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/channels/$provider",
+  component: ChannelDetailPage,
+})
+
 const triggerDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/triggers/$triggerId",
@@ -400,6 +475,8 @@ const routeTree = rootRoute.addChildren([
   connectorsRoute,
   connectorDetailRoute,
   triggersRoute,
+  channelsRoute,
+  channelDetailRoute,
   triggerDetailRoute,
   schedulesRoute,
   scheduleDetailRoute,

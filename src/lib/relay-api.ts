@@ -45,6 +45,33 @@ type GitHubIntegrationState = {
   recentEvents: GitHubWebhookEvent[]
 }
 
+type ChannelProvider = "slack" | "telegram" | "whatsapp" | "email"
+
+type ChannelState = {
+  provider: ChannelProvider
+  displayName: string
+  status: string
+  config: Record<string, string> | null
+  lastValidatedAt: string | null
+  lastError: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+type TelegramDiscoveryResponse = {
+  bot: {
+    id: string
+    username: string | null
+    firstName: string
+  }
+  chats: Array<{
+    id: string
+    type: string
+    title: string
+    username: string | null
+  }>
+}
+
 type TriggerCondition = {
   field: string
   operator: "equals" | "not_equals" | "contains"
@@ -58,6 +85,7 @@ type Trigger = {
   eventType: string
   conditions: TriggerCondition[]
   actionPrompt: string | null
+  channelTargets: ChannelProvider[]
   enabled: boolean
   executionCount: number
   lastFiredAt: string | null
@@ -86,6 +114,7 @@ type TriggerDetailResponse = {
     eventType: string
     conditions: TriggerCondition[]
     actionPrompt: string | null
+    channelTargets: ChannelProvider[]
     enabled: boolean
   }
   executions: TriggerExecution[]
@@ -193,6 +222,34 @@ async function getGitHubAvailableEvents() {
   return request<AvailableEventsResponse>("/api/integrations/github/available-events")
 }
 
+async function getChannels() {
+  return request<ChannelState[]>("/api/channels")
+}
+
+async function getChannel(provider: ChannelProvider) {
+  return request<ChannelState>(`/api/channels/${provider}`)
+}
+
+async function configureChannel(provider: ChannelProvider, data: Record<string, string>) {
+  return request<ChannelState>(`/api/channels/${provider}`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+async function discoverTelegramChats(botToken: string) {
+  return request<TelegramDiscoveryResponse>("/api/channels/telegram/discover", {
+    method: "POST",
+    body: JSON.stringify({ botToken }),
+  })
+}
+
+async function removeChannel(provider: ChannelProvider) {
+  return request<{ ok: true }>(`/api/channels/${provider}`, {
+    method: "DELETE",
+  })
+}
+
 async function getTriggers() {
   return request<Trigger[]>("/api/triggers")
 }
@@ -203,6 +260,7 @@ async function createTrigger(data: {
   eventType: string
   conditions?: TriggerCondition[]
   actionPrompt?: string
+  channelTargets?: ChannelProvider[]
   enabled?: boolean
 }) {
   return request<Trigger>("/api/triggers", {
@@ -219,6 +277,7 @@ async function updateTrigger(
     eventType: string
     conditions: TriggerCondition[]
     actionPrompt: string
+    channelTargets: ChannelProvider[]
     enabled: boolean
   }>,
 ) {
@@ -373,13 +432,17 @@ export {
   checkAgentCli,
   checkAgentSkill,
   configureAgent,
+  configureChannel,
   connectGitHub,
   createSchedule,
   createTrigger,
   detectAgents,
   deleteSchedule,
   deleteTrigger,
+  discoverTelegramChats,
   getAgent,
+  getChannel,
+  getChannels,
   getGitHubAvailableEvents,
   getGitHubIntegration,
   getScheduleExecutions,
@@ -388,6 +451,7 @@ export {
   getTriggers,
   prepareGitHubRepositoryWebhook,
   previewSchedule,
+  removeChannel,
   removeAgent,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
@@ -401,7 +465,10 @@ export type {
   AgentConfig,
   AgentTestResult,
   AvailableEventsResponse,
+  ChannelProvider,
+  ChannelState,
   DetectedAgent,
+  TelegramDiscoveryResponse,
   ValidateResult,
   GitHubIntegrationRepository,
   GitHubIntegrationState,

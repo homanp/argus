@@ -52,6 +52,17 @@ const githubWebhookEvents = sqliteTable("github_webhook_events", {
   receivedAt: text("received_at").notNull(),
 })
 
+const channels = sqliteTable("channels", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  status: text("status").notNull(),
+  configJson: text("config_json"),
+  lastValidatedAt: text("last_validated_at"),
+  lastError: text("last_error"),
+  ...timestamps,
+})
+
 const triggers = sqliteTable("triggers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -59,6 +70,7 @@ const triggers = sqliteTable("triggers", {
   eventType: text("event_type").notNull(),
   conditionsJson: text("conditions_json"),
   actionPrompt: text("action_prompt"),
+  channelTargetsJson: text("channel_targets_json"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   ...timestamps,
 })
@@ -71,6 +83,19 @@ const triggerExecutions = sqliteTable("trigger_executions", {
   status: text("status"),
   finishedAt: text("finished_at"),
   resultMessage: text("result_message"),
+})
+
+const triggerDeliveryAttempts = sqliteTable("trigger_delivery_attempts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  triggerExecutionId: integer("trigger_execution_id").notNull(),
+  provider: text("provider").notNull(),
+  targetLabel: text("target_label").notNull(),
+  status: text("status").notNull(),
+  providerMessageId: text("provider_message_id"),
+  responseBody: text("response_body"),
+  errorMessage: text("error_message"),
+  deliveredAt: text("delivered_at"),
+  createdAt: text("created_at").notNull(),
 })
 
 const schedules = sqliteTable("schedules", {
@@ -110,11 +135,13 @@ const agent = sqliteTable("agent", {
 
 export {
   agent,
+  channels,
   githubRepositories,
   githubWebhookEvents,
   integrations,
   scheduleExecutions,
   schedules,
+  triggerDeliveryAttempts,
   triggerExecutions,
   triggers,
 }

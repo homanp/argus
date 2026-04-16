@@ -17,7 +17,7 @@ import {
   SidebarResizeHandle,
 } from "@/components/ui/sidebar"
 import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
-import { getAgent, getSchedules, getTriggers } from "@/lib/relay-api"
+import { getAgent, getChannels, getSchedules, getTriggers } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
@@ -27,6 +27,7 @@ function AppSidebar() {
   const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
 
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  const [channelCount, setChannelCount] = useState<number | null>(null)
   const [scheduleCount, setScheduleCount] = useState<number | null>(null)
   const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
 
@@ -40,6 +41,11 @@ function AppSidebar() {
     getSchedules()
       .then((data) => {
         if (!cancelled) setScheduleCount(data.length)
+      })
+      .catch(() => {})
+    getChannels()
+      .then((data) => {
+        if (!cancelled) setChannelCount(data.filter((item) => item.status === "connected").length)
       })
       .catch(() => {})
     getAgent()
@@ -56,11 +62,12 @@ function AppSidebar() {
     () =>
       workspaceNavigation.map((item) => {
         if (item.title === "Triggers" && triggerCount !== null) return { ...item, count: String(triggerCount) }
+        if (item.title === "Channels" && channelCount !== null) return { ...item, count: String(channelCount) }
         if (item.title === "Schedules" && scheduleCount !== null) return { ...item, count: String(scheduleCount) }
         if (item.title === "Agents" && agentConfigured === false) return { ...item, warning: true }
         return item
       }),
-    [triggerCount, scheduleCount, agentConfigured],
+    [triggerCount, channelCount, scheduleCount, agentConfigured],
   )
 
   return (

@@ -7,14 +7,17 @@ import express from "express"
 import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
 import { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, runAgent } from "./agent.js"
+import { deliverNotification, parseStructuredAgentResult, type DeliveryNotification } from "./delivery.js"
 import { createDatabase } from "./db/client.js"
 import {
   agent as agentTable,
+  channels,
   githubRepositories,
   githubWebhookEvents,
   integrations,
   scheduleExecutions,
   schedules,
+  triggerDeliveryAttempts,
   triggerExecutions,
   triggers,
 } from "./db/schema.js"
@@ -115,6 +118,52 @@ type RepositoryRow = typeof githubRepositories.$inferSelect
 type WebhookEventRow = typeof githubWebhookEvents.$inferSelect
 type TriggerRow = typeof triggers.$inferSelect
 type ScheduleRow = typeof schedules.$inferSelect
+type ChannelRow = typeof channels.$inferSelect
+
+type ChannelProvider = "slack" | "telegram" | "whatsapp" | "email"
+
+type ChannelState = {
+  provider: ChannelProvider
+  displayName: string
+  status: string
+  config: Record<string, string> | null
+  lastValidatedAt: string | null
+  lastError: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+type TelegramBot = {
+  id: number
+  username?: string
+  first_name: string
+}
+
+type TelegramChat = {
+  id: number
+  type: string
+  title?: string
+  username?: string
+  first_name?: string
+  last_name?: string
+}
+
+type TelegramUpdate = {
+  update_id: number
+  message?: {
+    chat?: TelegramChat
+  }
+  channel_post?: {
+    chat?: TelegramChat
+  }
+}
+
+const CHANNEL_METADATA: Record<ChannelProvider, { displayName: string }> = {
+  slack: { displayName: "Slack" },
+  telegram: { displayName: "Telegram" },
+  whatsapp: { displayName: "WhatsApp" },
+  email: { displayName: "Email" },
+}
 
 const config: {
   port: number
@@ -147,6 +196,179 @@ const app = express()
 
 function now() {
   return new Date().toISOString()
+}
+
+function isChannelProvider(value: string): value is ChannelProvider {
+  return value in CHANNEL_METADATA
+}
+
+function channelConfigForProvider(provider: ChannelProvider, body: Record<string, unknown>) {
+  const read = (key: string) => (typeof body[key] === "string" ? body[key].trim() : "")
+
+  switch (provider) {
+    case "slack": {
+      const botToken = read("botToken")
+      const channelId = read("channelId")
+      if (!botToken || !channelId) throw new Error("Slack requires a bot token and channel ID.")
+      return { botToken, channelId }
+    }
+    case "telegram": {
+      const botToken = read("botToken")
+      const chatId = read("chatId")
+      if (!botToken || !chatId) throw new Error("Telegram requires a bot token and chat ID.")
+      return { botToken, chatId }
+    }
+    case "whatsapp": {
+      const accessToken = read("accessToken")
+      const phoneNumberId = read("phoneNumberId")
+      const recipient = read("recipient")
+      if (!accessToken || !phoneNumberId || !recipient) {
+        throw new Error("WhatsApp requires an access token, phone number ID, and recipient.")
+      }
+      return { accessToken, phoneNumberId, recipient }
+    }
+    case "email": {
+      const apiKey = read("apiKey")
+      const fromEmail = read("fromEmail")
+      const toEmail = read("toEmail")
+      if (!apiKey || !fromEmail || !toEmail) {
+        throw new Error("Email requires a Resend API key, from email, and to email.")
+      }
+      return { apiKey, fromEmail, toEmail }
+    }
+  }
+}
+
+function resolveChannelState(provider: ChannelProvider, row?: ChannelRow): ChannelState {
+  const metadata = CHANNEL_METADATA[provider]
+  let parsedConfig: Record<string, string> | null = null
+  if (row?.configJson) {
+    try {
+      parsedConfig = JSON.parse(row.configJson) as Record<string, string>
+    } catch {
+      parsedConfig = null
+    }
+  }
+
+  return {
+    provider,
+    displayName: metadata.displayName,
+    status: row?.status ?? "not_connected",
+    config: parsedConfig,
+    lastValidatedAt: row?.lastValidatedAt ?? null,
+    lastError: row?.lastError ?? null,
+    createdAt: row?.createdAt ?? null,
+    updatedAt: row?.updatedAt ?? null,
+  }
+}
+
+async function getChannelsState() {
+  const rows = await db.select().from(channels)
+  const map = new Map(rows.map((row) => [row.provider, row]))
+  return (Object.keys(CHANNEL_METADATA) as ChannelProvider[]).map((provider) =>
+    resolveChannelState(provider, map.get(provider)),
+  )
+}
+
+async function getChannelState(provider: ChannelProvider) {
+  const [row]: ChannelRow[] = await db.select().from(channels).where(eq(channels.provider, provider))
+  return resolveChannelState(provider, row)
+}
+
+async function upsertChannel(provider: ChannelProvider, body: Record<string, unknown>) {
+  const timestamp = now()
+  const configJson = JSON.stringify(channelConfigForProvider(provider, body))
+  const [existing]: ChannelRow[] = await db.select().from(channels).where(eq(channels.provider, provider))
+
+  if (existing) {
+    await db
+      .update(channels)
+      .set({
+        displayName: CHANNEL_METADATA[provider].displayName,
+        status: "connected",
+        configJson,
+        lastValidatedAt: timestamp,
+        lastError: null,
+        updatedAt: timestamp,
+      })
+      .where(eq(channels.id, existing.id))
+  } else {
+    await db.insert(channels).values({
+      id: crypto.randomUUID(),
+      provider,
+      displayName: CHANNEL_METADATA[provider].displayName,
+      status: "connected",
+      configJson,
+      lastValidatedAt: timestamp,
+      lastError: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+  }
+
+  return getChannelState(provider)
+}
+
+async function removeChannel(provider: ChannelProvider) {
+  await db.delete(channels).where(eq(channels.provider, provider))
+}
+
+async function telegramRequest<T>(botToken: string, method: string) {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`)
+  const body = await response.text()
+
+  if (!response.ok) {
+    throw new Error(body || `Telegram request failed with status ${response.status}.`)
+  }
+
+  const parsed = JSON.parse(body) as { ok?: boolean; description?: string; result?: T }
+  if (!parsed.ok || parsed.result === undefined) {
+    throw new Error(parsed.description ?? "Telegram request failed.")
+  }
+
+  return parsed.result
+}
+
+function formatTelegramChat(chat: TelegramChat) {
+  const title =
+    chat.title?.trim() ||
+    [chat.first_name?.trim(), chat.last_name?.trim()].filter(Boolean).join(" ").trim() ||
+    (chat.username ? `@${chat.username}` : `Chat ${chat.id}`)
+
+  return {
+    id: String(chat.id),
+    type: chat.type,
+    title,
+    username: chat.username ?? null,
+  }
+}
+
+async function discoverTelegramChats(botToken: string) {
+  const token = botToken.trim()
+  if (!token) {
+    throw new Error("Telegram bot token is required.")
+  }
+
+  const bot = await telegramRequest<TelegramBot>(token, "getMe")
+  const updates = await telegramRequest<TelegramUpdate[]>(token, "getUpdates")
+  const byId = new Map<string, ReturnType<typeof formatTelegramChat>>()
+
+  for (const update of updates) {
+    const chat = update.message?.chat ?? update.channel_post?.chat
+    if (!chat) continue
+    byId.set(String(chat.id), formatTelegramChat(chat))
+  }
+
+  const chats = [...byId.values()].sort((a, b) => a.title.localeCompare(b.title))
+
+  return {
+    bot: {
+      id: String(bot.id),
+      username: bot.username ?? null,
+      firstName: bot.first_name,
+    },
+    chats,
+  }
 }
 
 async function githubRequest<T>(apiKey: string, route: string, init?: RequestInit) {
@@ -662,6 +884,15 @@ type TriggerCondition = {
   value: string
 }
 
+function parseChannelTargets(trigger: TriggerRow): ChannelProvider[] {
+  if (!trigger.channelTargetsJson) return []
+  try {
+    return (JSON.parse(trigger.channelTargetsJson) as string[]).filter(isChannelProvider)
+  } catch {
+    return []
+  }
+}
+
 function resolveField(object: Record<string, unknown>, path: string): unknown[] {
   let current: unknown[] = [object]
 
@@ -717,6 +948,7 @@ function buildTriggerContext(
   provider: string,
   eventType: string,
   payload: Record<string, unknown>,
+  channelTargets: ChannelProvider[],
 ): string {
   const lines = [
     `[Trigger: ${trigger.name}]`,
@@ -729,6 +961,29 @@ function buildTriggerContext(
     `[Task]`,
     trigger.actionPrompt,
   ]
+
+  if (channelTargets.length > 0) {
+    lines.push(
+      ``,
+      `[Output requirements]`,
+      `This result will be sent to external channels: ${channelTargets.join(", ")}.`,
+      `Return valid JSON only. Do not wrap the JSON in markdown fences.`,
+      `Use this exact shape:`,
+      JSON.stringify(
+        {
+          review: "full internal reasoning for Argus execution history",
+          channelTitle: "short title for the notification",
+          channelSummary: "plain English summary for a human reading the channel message",
+          actionNeeded: false,
+          commentNeeded: false,
+        },
+        null,
+        2,
+      ),
+      `Keep channelSummary concise and easy to skim in Telegram or Slack.`,
+    )
+  }
+
   return lines.join("\n")
 }
 
@@ -750,6 +1005,7 @@ async function evaluateTriggers(
     const conditions: TriggerCondition[] = trigger.conditionsJson
       ? (JSON.parse(trigger.conditionsJson) as TriggerCondition[])
       : []
+    const channelTargets = parseChannelTargets(trigger)
 
     if (conditions.length === 0 || evaluateConditions(payload, conditions)) {
       const [execution] = await db
@@ -763,18 +1019,45 @@ async function evaluateTriggers(
         .returning()
 
       fired += 1
+      const deliver = async (
+        agentResult?: string | null,
+        structured?: {
+          channelTitle?: string
+          channelSummary?: string
+          actionNeeded?: boolean
+          commentNeeded?: boolean
+        } | null,
+      ) => {
+        if (channelTargets.length === 0) return
+
+        const notification: DeliveryNotification = {
+          trigger,
+          sourceProvider: provider,
+          eventType,
+          payload,
+          agentResult,
+          channelTitle: structured?.channelTitle ?? null,
+          channelSummary: structured?.channelSummary ?? null,
+          actionNeeded: structured?.actionNeeded ?? null,
+          commentNeeded: structured?.commentNeeded ?? null,
+        }
+
+        await deliverNotification(db, execution.id, channelTargets, notification, new Date().toISOString())
+      }
 
       if (trigger.actionPrompt) {
         const configured = getConfiguredAgent(db)
         if (configured && configured.status === "active") {
           db.update(triggerExecutions).set({ status: "running" }).where(eq(triggerExecutions.id, execution.id)).run()
 
-          const enrichedPrompt = buildTriggerContext(trigger, provider, eventType, payload)
+          const enrichedPrompt = buildTriggerContext(trigger, provider, eventType, payload, channelTargets)
           runAgent(configured.command, enrichedPrompt)
             .then((result) => {
               const finished = new Date().toISOString()
               const status = result.exitCode === 0 ? "completed" : "failed"
-              const resultMessage = result.stdout || result.stderr || `exit ${result.exitCode}`
+              const rawResultMessage = result.stdout || result.stderr || `exit ${result.exitCode}`
+              const structuredResult = channelTargets.length > 0 ? parseStructuredAgentResult(rawResultMessage) : null
+              const resultMessage = structuredResult?.review?.trim() || rawResultMessage
 
               db.update(triggerExecutions)
                 .set({ status, finishedAt: finished, resultMessage: resultMessage.slice(0, 4000) })
@@ -785,6 +1068,7 @@ async function evaluateTriggers(
                 .set({ lastUsedAt: finished, updatedAt: finished })
                 .where(eq(agentTable.id, "default"))
                 .run()
+              void deliver(resultMessage.slice(0, 2000), structuredResult)
               console.log(`[agent] trigger "${trigger.name}" → exit ${result.exitCode}`)
             })
             .catch((err) => {
@@ -792,9 +1076,14 @@ async function evaluateTriggers(
                 .set({ status: "failed", finishedAt: new Date().toISOString(), resultMessage: String(err) })
                 .where(eq(triggerExecutions.id, execution.id))
                 .run()
+              void deliver(String(err).slice(0, 2000))
               console.error(`[agent] trigger "${trigger.name}" failed:`, err)
             })
+        } else {
+          void deliver(null)
         }
+      } else {
+        void deliver(null)
       }
     }
   }
@@ -833,6 +1122,56 @@ app.get("/health", (_request, response) => {
     ok: true,
     relayBaseUrl: config.relayBaseUrl,
   })
+})
+
+app.get("/api/channels", async (_request, response) => {
+  response.json(await getChannelsState())
+})
+
+app.post("/api/channels/telegram/discover", express.json(), async (request, response) => {
+  const botToken = typeof request.body?.botToken === "string" ? request.body.botToken : ""
+
+  try {
+    response.json(await discoverTelegramChats(botToken))
+  } catch (error) {
+    response.status(400).json({
+      error: error instanceof Error ? error.message : "Failed to discover Telegram chats.",
+    })
+  }
+})
+
+app.get("/api/channels/:provider", async (request, response) => {
+  if (!isChannelProvider(request.params.provider)) {
+    response.status(404).json({ error: "Unknown channel provider." })
+    return
+  }
+
+  response.json(await getChannelState(request.params.provider))
+})
+
+app.post("/api/channels/:provider", express.json(), async (request, response) => {
+  if (!isChannelProvider(request.params.provider)) {
+    response.status(404).json({ error: "Unknown channel provider." })
+    return
+  }
+
+  try {
+    response.json(await upsertChannel(request.params.provider, request.body ?? {}))
+  } catch (error) {
+    response.status(400).json({
+      error: error instanceof Error ? error.message : "Failed to save channel configuration.",
+    })
+  }
+})
+
+app.delete("/api/channels/:provider", async (request, response) => {
+  if (!isChannelProvider(request.params.provider)) {
+    response.status(404).json({ error: "Unknown channel provider." })
+    return
+  }
+
+  await removeChannel(request.params.provider)
+  response.json({ ok: true })
 })
 
 app.get("/api/integrations/github", async (_request, response) => {
@@ -1079,6 +1418,7 @@ app.get("/api/triggers", async (_request, response) => {
       eventType: trigger.eventType,
       conditions: trigger.conditionsJson ? JSON.parse(trigger.conditionsJson) : [],
       actionPrompt: trigger.actionPrompt ?? null,
+      channelTargets: parseChannelTargets(trigger),
       enabled: Boolean(trigger.enabled),
       executionCount: countMap.get(trigger.id) ?? 0,
       lastFiredAt: lastFiredMap.get(trigger.id) ?? null,
@@ -1089,7 +1429,7 @@ app.get("/api/triggers", async (_request, response) => {
 })
 
 app.post("/api/triggers", express.json(), async (request, response) => {
-  const { name, provider, eventType, conditions, actionPrompt, enabled } = request.body ?? {}
+  const { name, provider, eventType, conditions, actionPrompt, channelTargets, enabled } = request.body ?? {}
 
   if (!name || typeof name !== "string") {
     response.status(400).json({ error: "Trigger name is required." })
@@ -1115,6 +1455,11 @@ app.post("/api/triggers", express.json(), async (request, response) => {
     eventType,
     conditionsJson: Array.isArray(conditions) && conditions.length > 0 ? JSON.stringify(conditions) : null,
     actionPrompt: promptValue,
+    channelTargetsJson: (() => {
+      if (!Array.isArray(channelTargets)) return null
+      const filtered = channelTargets.filter((item: unknown) => typeof item === "string" && isChannelProvider(item))
+      return filtered.length > 0 ? JSON.stringify(filtered) : null
+    })(),
     enabled: enabled !== false,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -1128,6 +1473,7 @@ app.post("/api/triggers", express.json(), async (request, response) => {
     eventType: created.eventType,
     conditions: created.conditionsJson ? JSON.parse(created.conditionsJson) : [],
     actionPrompt: created.actionPrompt ?? null,
+    channelTargets: parseChannelTargets(created),
     enabled: Boolean(created.enabled),
     executionCount: 0,
     lastFiredAt: null,
@@ -1160,6 +1506,14 @@ app.patch("/api/triggers/:triggerId", express.json(), async (request, response) 
     const val = request.body.actionPrompt
     updates.actionPrompt = typeof val === "string" && val.trim() ? val.trim() : null
   }
+  if (request.body.channelTargets !== undefined) {
+    updates.channelTargetsJson =
+      Array.isArray(request.body.channelTargets) && request.body.channelTargets.length > 0
+        ? JSON.stringify(
+            request.body.channelTargets.filter((item: unknown) => typeof item === "string" && isChannelProvider(item)),
+          )
+        : null
+  }
 
   await db.update(triggers).set(updates).where(eq(triggers.id, existing.id))
 
@@ -1182,6 +1536,7 @@ app.patch("/api/triggers/:triggerId", express.json(), async (request, response) 
     eventType: updated.eventType,
     conditions: updated.conditionsJson ? JSON.parse(updated.conditionsJson) : [],
     actionPrompt: updated.actionPrompt ?? null,
+    channelTargets: parseChannelTargets(updated),
     enabled: Boolean(updated.enabled),
     executionCount: execCount?.count ?? 0,
     lastFiredAt: lastExec?.matchedAt ?? null,
@@ -1198,6 +1553,14 @@ app.delete("/api/triggers/:triggerId", async (request, response) => {
     return
   }
 
+  const executions = await db
+    .select({ id: triggerExecutions.id })
+    .from(triggerExecutions)
+    .where(eq(triggerExecutions.triggerId, existing.id))
+  const executionIds = executions.map((row) => row.id)
+  if (executionIds.length > 0) {
+    await db.delete(triggerDeliveryAttempts).where(inArray(triggerDeliveryAttempts.triggerExecutionId, executionIds))
+  }
   await db.delete(triggerExecutions).where(eq(triggerExecutions.triggerId, existing.id))
   await db.delete(triggers).where(eq(triggers.id, existing.id))
 
@@ -1239,6 +1602,7 @@ app.get("/api/triggers/:triggerId/executions", async (request, response) => {
       eventType: existing.eventType,
       conditions: existing.conditionsJson ? JSON.parse(existing.conditionsJson) : [],
       actionPrompt: existing.actionPrompt ?? null,
+      channelTargets: parseChannelTargets(existing),
       enabled: Boolean(existing.enabled),
     },
     executions: executions.map((row) => ({

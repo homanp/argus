@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { AiBrain02Icon, CancelCircleIcon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons"
 
+import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -200,9 +201,7 @@ function AgentsPage() {
                   <p className="text-[13px] font-medium text-white/85">{configured.name}</p>
                   <p className="font-mono text-[12px] text-white/40">{configured.command}</p>
                 </div>
-                <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[11px] text-emerald-200">
-                  Active
-                </span>
+                <Badge variant="success">Active</Badge>
               </div>
 
               {configured.lastUsedAt && (

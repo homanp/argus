@@ -63,6 +63,18 @@ function createDatabase(databasePath: string) {
       received_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS channels (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      config_json TEXT,
+      last_validated_at TEXT,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS triggers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -70,6 +82,7 @@ function createDatabase(databasePath: string) {
       event_type TEXT NOT NULL,
       conditions_json TEXT,
       action_prompt TEXT,
+      channel_targets_json TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -80,6 +93,19 @@ function createDatabase(databasePath: string) {
       trigger_id TEXT NOT NULL,
       webhook_event_id INTEGER NOT NULL,
       matched_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS trigger_delivery_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger_execution_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      target_label TEXT NOT NULL,
+      status TEXT NOT NULL,
+      provider_message_id TEXT,
+      response_body TEXT,
+      error_message TEXT,
+      delivered_at TEXT,
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS schedules (
@@ -124,6 +150,9 @@ function createDatabase(databasePath: string) {
   const triggerColumns = sqlite.pragma("table_info(triggers)") as { name: string }[]
   if (!triggerColumns.some((col) => col.name === "action_prompt")) {
     sqlite.exec("ALTER TABLE triggers ADD COLUMN action_prompt TEXT")
+  }
+  if (!triggerColumns.some((col) => col.name === "channel_targets_json")) {
+    sqlite.exec("ALTER TABLE triggers ADD COLUMN channel_targets_json TEXT")
   }
 
   const triggerExecColumns = sqlite.pragma("table_info(trigger_executions)") as { name: string }[]

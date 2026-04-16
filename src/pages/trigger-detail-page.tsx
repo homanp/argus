@@ -3,13 +3,16 @@ import { Loading03Icon } from "@hugeicons/core-free-icons"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
+import { Badge, badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TriggerSheet } from "@/components/trigger-sheet"
 import {
   deleteTrigger,
+  getChannels,
   getGitHubAvailableEvents,
   getTriggerExecutions,
   type AvailableEventsResponse,
+  type ChannelState,
   type Trigger,
   type TriggerDetailResponse,
   type TriggerExecution,
@@ -37,11 +40,7 @@ function syncNavbar(name: string, enabled: boolean) {
   const statusEl = document.getElementById("trigger-detail-status")
   if (statusEl) {
     statusEl.textContent = enabled ? "Enabled" : "Disabled"
-    statusEl.className = `ml-1 rounded-full border px-1.5 py-0.5 text-[10px] ${
-      enabled
-        ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
-        : "border-white/10 bg-white/[0.04] text-white/40"
-    }`
+    statusEl.className = `ml-1 ${badgeVariants({ size: "sm", variant: enabled ? "success" : "neutral" })}`
   }
 }
 
@@ -128,6 +127,7 @@ function TriggerDetailPage() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [availableEvents, setAvailableEvents] = useState<string[]>([])
+  const [availableChannels, setAvailableChannels] = useState<ChannelState[]>([])
   const [eventsSource, setEventsSource] = useState<string>("static_fallback")
   const [page, setPage] = useState(0)
 
@@ -152,6 +152,9 @@ function TriggerDetailPage() {
         setAvailableEvents(r.events)
         setEventsSource(r.source)
       })
+      .catch(() => {})
+    getChannels()
+      .then((channels) => setAvailableChannels(channels))
       .catch(() => {})
     setSheetOpen(true)
   }
@@ -231,12 +234,10 @@ function TriggerDetailPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <div className="overflow-hidden rounded-lg border border-white/8">
           <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">
-            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-px text-[10px] text-white/45">
-              {trigger.provider}
-            </span>
-            <span className="rounded border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+            <Badge size="sm">{trigger.provider}</Badge>
+            <Badge variant="violet" size="sm">
               {formatEventType(trigger.eventType)}
-            </span>
+            </Badge>
           </div>
 
           {trigger.conditions.length > 0 && (
@@ -264,7 +265,20 @@ function TriggerDetailPage() {
             </div>
           )}
 
-          {!trigger.conditions.length && !trigger.actionPrompt && (
+          {trigger.channelTargets.length > 0 && (
+            <div className="border-t border-white/6 px-4 py-3">
+              <p className="mb-1.5 text-[12px] font-medium text-white/40">Delivery channels</p>
+              <div className="flex flex-wrap gap-1.5">
+                {trigger.channelTargets.map((target) => (
+                  <Badge key={target} size="sm">
+                    {target}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!trigger.conditions.length && !trigger.actionPrompt && trigger.channelTargets.length === 0 && (
             <div className="px-4 py-3 text-[13px] text-white/30">No conditions or action prompt configured.</div>
           )}
         </div>
@@ -343,6 +357,7 @@ function TriggerDetailPage() {
               } satisfies Trigger
             }
             availableEvents={availableEvents}
+            availableChannels={availableChannels}
             eventsSource={eventsSource}
             onSaved={reload}
           />

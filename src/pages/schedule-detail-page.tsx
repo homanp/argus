@@ -3,6 +3,7 @@ import { Loading03Icon } from "@hugeicons/core-free-icons"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
+import { Badge, badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScheduleSheet } from "@/components/schedule-sheet"
 import {
@@ -21,11 +22,7 @@ function syncNavbar(name: string, enabled: boolean) {
   const statusEl = document.getElementById("schedule-detail-status")
   if (statusEl) {
     statusEl.textContent = enabled ? "Enabled" : "Disabled"
-    statusEl.className = `ml-1 rounded-full border px-1.5 py-0.5 text-[10px] ${
-      enabled
-        ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
-        : "border-white/10 bg-white/[0.04] text-white/40"
-    }`
+    statusEl.className = `ml-1 ${badgeVariants({ size: "sm", variant: enabled ? "success" : "neutral" })}`
   }
 }
 
@@ -58,9 +55,9 @@ function ExecutionRow({ execution }: { execution: ScheduleExecution }) {
           )}
         </p>
       </div>
-      <span className="shrink-0 rounded border border-white/8 bg-white/[0.03] px-1.5 py-px text-[10px] text-white/35">
+      <Badge size="sm" className="shrink-0">
         {execution.status}
-      </span>
+      </Badge>
     </div>
   )
 }
@@ -165,12 +162,10 @@ function ScheduleDetailPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <div className="overflow-hidden rounded-lg border border-white/8">
           <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">
-            <span className="rounded border border-violet-300/20 bg-violet-300/10 px-1.5 py-px text-[10px] text-violet-200">
+            <Badge variant="violet" size="sm">
               {humanCron(schedule.cronExpression)}
-            </span>
-            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-px text-[10px] text-white/45">
-              {schedule.timezone}
-            </span>
+            </Badge>
+            <Badge size="sm">{schedule.timezone}</Badge>
             {schedule.nextRunAt && schedule.enabled && (
               <span className="text-[10px] text-white/30">Next: {relativeTime(schedule.nextRunAt)}</span>
             )}
