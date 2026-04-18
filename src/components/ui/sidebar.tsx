@@ -18,7 +18,7 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_MIN_WIDTH = 200
 const SIDEBAR_MAX_WIDTH = 320
-const SIDEBAR_DEFAULT_WIDTH = 220
+const SIDEBAR_DEFAULT_WIDTH = 300
 
 function readPersistedWidth(): number {
   try {
@@ -146,10 +146,10 @@ function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) data-[side=left]:left-0 data-[side=right]:right-0 md:flex",
+          "fixed hidden w-(--sidebar-width) bg-sidebar md:flex",
           variant === "floating" || variant === "inset"
-            ? "p-2"
-            : "group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            ? "inset-y-0 z-10 h-svh p-2 data-[side=left]:left-0 data-[side=right]:right-0"
+            : "z-50 top-2 bottom-2 left-2 h-[calc(100svh-16px)] rounded-xl border border-white/[0.06]",
           className,
         )}
         {...props}
@@ -157,7 +157,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+          className="flex size-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
         >
           {children}
         </div>
@@ -201,7 +201,7 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
       onMouseDown={onMouseDown}
       className={cn(
         "absolute inset-y-0 z-20 hidden w-2 -right-1 cursor-col-resize select-none sm:block",
-        "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent after:transition-colors hover:after:bg-white/15",
+        "after:absolute after:inset-y-4 after:left-1/2 after:w-[2px] after:rounded-full after:bg-transparent after:transition-colors hover:after:bg-white/15",
         className,
       )}
       {...props}

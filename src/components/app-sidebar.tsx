@@ -93,7 +93,7 @@ function AppSidebar() {
   )
 
   return (
-    <Sidebar className="border-white/8 pt-9">
+    <Sidebar className="pt-11">
       <SidebarContent className="pt-1 pb-2">
         <SidebarGroup className="pt-0">
           <SidebarMenu>
