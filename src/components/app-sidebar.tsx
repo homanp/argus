@@ -58,15 +58,27 @@ function AppSidebar() {
         if (!cancelled) setAgentConfigured(data !== null)
       })
       .catch(() => {})
-    getRecentSessions()
-      .then((data) => {
-        if (!cancelled) setRecentSessions(data)
-      })
-      .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [pathname])
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchSessions = () => {
+      getRecentSessions()
+        .then((data) => {
+          if (!cancelled) setRecentSessions(data)
+        })
+        .catch(() => {})
+    }
+    fetchSessions()
+    const interval = setInterval(fetchSessions, 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   const resolvedWorkspaceNav = useMemo(
     () =>
