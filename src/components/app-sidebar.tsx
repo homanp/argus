@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Link, useRouterState } from "@tanstack/react-router"
-import { Alert02Icon, GithubIcon, Settings01Icon } from "@hugeicons/core-free-icons"
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
+import { Alert02Icon, GithubIcon, MoreHorizontalIcon, Settings01Icon } from "@hugeicons/core-free-icons"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
 import {
@@ -16,20 +16,25 @@ import {
   SidebarMenuItem,
   SidebarResizeHandle,
 } from "@/components/ui/sidebar"
-import { openTasks, primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
-import { getAgent, getChannels, getSchedules, getTriggers } from "@/lib/relay-api"
+import { primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
+import { getAgent, getChannels, getRecentSessions, getSchedules, getTriggers } from "@/lib/relay-api"
+import type { RecentSession } from "@/lib/relay-api"
+import { timeAgo } from "@/lib/schedule-utils"
 import { cn } from "@/lib/utils"
 
 function AppSidebar() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const navigate = useNavigate()
   const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
 
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   const [channelCount, setChannelCount] = useState<number | null>(null)
   const [scheduleCount, setScheduleCount] = useState<number | null>(null)
   const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
+  const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
+  const [sessionsExpanded, setSessionsExpanded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +63,23 @@ function AppSidebar() {
     }
   }, [pathname])
 
+  useEffect(() => {
+    let cancelled = false
+    const fetchSessions = () => {
+      getRecentSessions()
+        .then((data) => {
+          if (!cancelled) setRecentSessions(data)
+        })
+        .catch(() => {})
+    }
+    fetchSessions()
+    const interval = setInterval(fetchSessions, 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
+
   const resolvedWorkspaceNav = useMemo(
     () =>
       workspaceNavigation.map((item) => {
@@ -71,7 +93,7 @@ function AppSidebar() {
   )
 
   return (
-    <Sidebar className="border-white/8 pt-9">
+    <Sidebar className="pt-11">
       <SidebarContent className="pt-1 pb-2">
         <SidebarGroup className="pt-0">
           <SidebarMenu>
@@ -157,17 +179,51 @@ function AppSidebar() {
 
         <SidebarGroup className="pt-1">
           <SidebarGroupLabel className="px-1 pb-2 text-[11px] font-medium tracking-[0.02em] text-white/35">
-            Open tasks
+            Recent sessions
           </SidebarGroupLabel>
           <SidebarMenu>
-            {openTasks.map((task) => (
-              <SidebarMenuItem key={task.title}>
-                <SidebarMenuButton className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white">
-                  <span className={cn("size-2 rounded-full", task.toneClassName)} />
-                  <span>{task.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            {recentSessions.length === 0 ? (
+              <li className="px-2.5 py-1 text-[12px] text-white/25">No recent sessions</li>
+            ) : (
+              <>
+                {(sessionsExpanded ? recentSessions : recentSessions.slice(0, 5)).map((session) => (
+                  <SidebarMenuItem key={session.id}>
+                    <SidebarMenuButton
+                      onClick={() =>
+                        session.type === "trigger"
+                          ? navigate({ to: "/triggers/$triggerId", params: { triggerId: session.sourceId } })
+                          : navigate({ to: "/schedules/$scheduleId", params: { scheduleId: session.sourceId } })
+                      }
+                      className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+                    >
+                      <span
+                        className={cn(
+                          "size-1.5 shrink-0 rounded-full",
+                          session.status === "running" &&
+                            "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)] animate-pulse",
+                          session.status === "completed" && "bg-emerald-400",
+                          session.status === "failed" && "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.4)]",
+                          session.status === "matched" && "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]",
+                        )}
+                      />
+                      <span className="truncate">{session.name}</span>
+                      <span className="ml-auto shrink-0 text-[11px] text-white/25">{timeAgo(session.startedAt)}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                {recentSessions.length > 5 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => setSessionsExpanded((v) => !v)}
+                      className="h-7 rounded-md px-2.5 text-[11px] text-white/30 hover:bg-white/5 hover:text-white"
+                    >
+                      <HugeIcon icon={MoreHorizontalIcon} size={14} className="text-white/30" />
+                      <span>{sessionsExpanded ? "Show less" : "More"}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </>
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

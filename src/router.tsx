@@ -122,11 +122,11 @@ function RootLayout() {
 
   return (
     <div className="relative min-h-svh">
-      <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-40 h-8" />
+      <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-[5] h-8" />
       <SidebarProvider className="min-h-svh flex-1">
         <AppSidebar />
-        <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent pt-0">
-          <header className="z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-transparent px-4 backdrop-blur-xl md:px-5">
+        <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent">
+          <header className="z-10 mt-2 flex h-11 shrink-0 items-center justify-between bg-transparent px-6 backdrop-blur-xl md:px-8">
             <div className="flex min-w-0 items-center gap-2">
               {providerTitle || isTriggersDetail || isSchedulesDetail ? (
                 <Link

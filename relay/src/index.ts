@@ -1847,6 +1847,69 @@ app.get("/api/schedules/:scheduleId/executions", async (request, response) => {
   })
 })
 
+// ── Sessions (unified recent executions) ──
+
+app.get("/api/sessions/recent", async (_request, response) => {
+  const triggerRows = db
+    .select({
+      id: triggerExecutions.id,
+      sourceId: triggerExecutions.triggerId,
+      name: triggers.name,
+      status: triggerExecutions.status,
+      startedAt: triggerExecutions.matchedAt,
+      finishedAt: triggerExecutions.finishedAt,
+      resultMessage: triggerExecutions.resultMessage,
+    })
+    .from(triggerExecutions)
+    .leftJoin(triggers, eq(triggerExecutions.triggerId, triggers.id))
+    .orderBy(desc(triggerExecutions.matchedAt))
+    .limit(20)
+    .all()
+
+  const scheduleRows = db
+    .select({
+      id: scheduleExecutions.id,
+      sourceId: scheduleExecutions.scheduleId,
+      name: schedules.name,
+      status: scheduleExecutions.status,
+      startedAt: scheduleExecutions.startedAt,
+      finishedAt: scheduleExecutions.finishedAt,
+      resultMessage: scheduleExecutions.resultMessage,
+    })
+    .from(scheduleExecutions)
+    .leftJoin(schedules, eq(scheduleExecutions.scheduleId, schedules.id))
+    .orderBy(desc(scheduleExecutions.startedAt))
+    .limit(20)
+    .all()
+
+  const combined = [
+    ...triggerRows.map((r) => ({
+      id: `trigger-${r.id}`,
+      type: "trigger" as const,
+      sourceId: r.sourceId,
+      name: r.name ?? "Unknown trigger",
+      status: r.status ?? "matched",
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt ?? null,
+      resultMessage: r.resultMessage?.slice(0, 200) ?? null,
+    })),
+    ...scheduleRows.map((r) => ({
+      id: `schedule-${r.id}`,
+      type: "schedule" as const,
+      sourceId: r.sourceId,
+      name: r.name ?? "Unknown schedule",
+      status: r.status,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt ?? null,
+      resultMessage: r.resultMessage?.slice(0, 200) ?? null,
+    })),
+  ]
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    .slice(0, 20)
+
+  response.json(combined)
+})
+
 // ── Agent routes ──
 
 app.get("/api/agent", async (_request, response) => {
