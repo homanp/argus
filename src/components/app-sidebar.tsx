@@ -200,7 +200,7 @@ function AppSidebar() {
                         className={cn(
                           "size-1.5 shrink-0 rounded-full",
                           session.status === "running" &&
-                            "bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-pulse",
+                            "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)] animate-pulse",
                           session.status === "completed" && "bg-emerald-400",
                           session.status === "failed" && "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.4)]",
                           session.status === "matched" && "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]",
