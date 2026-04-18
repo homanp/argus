@@ -117,6 +117,19 @@ function timeAgo(iso: string) {
   return `${days}d ago`
 }
 
+function duration(startIso: string, endIso: string) {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
+  if (ms < 1000) return `${ms}ms`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.round(seconds % 60)
+  if (minutes < 60) return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+}
+
 function relativeTime(iso: string) {
   const diff = new Date(iso).getTime() - Date.now()
   if (diff <= 0) return "now"
@@ -132,6 +145,7 @@ export {
   buildCronExpression,
   DAY_LABELS,
   describeCron,
+  duration,
   FREQUENCY_LABELS,
   humanCron,
   pad2,

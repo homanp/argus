@@ -29,11 +29,6 @@ type NavigationItem = {
   warning?: boolean
 }
 
-type TaskItem = {
-  title: string
-  toneClassName: string
-}
-
 type DecisionCardData = {
   id: string
   urgent?: boolean
@@ -105,25 +100,6 @@ const workspaceNavigation: NavigationItem[] = [
     title: "Agents",
     icon: AiBrain02Icon,
     href: "/agents",
-  },
-]
-
-const openTasks: TaskItem[] = [
-  {
-    title: "Acme Corp refund",
-    toneClassName: "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.45)]",
-  },
-  {
-    title: "Sequoia reschedule",
-    toneClassName: "bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.45)]",
-  },
-  {
-    title: "PR #891 merge",
-    toneClassName: "bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.45)]",
-  },
-  {
-    title: "SFO flight booking",
-    toneClassName: "bg-emerald-400 shadow-[0_0_12px_rgba(74,222,128,0.4)]",
   },
 ]
 
@@ -233,5 +209,5 @@ const missionsHeader = {
   subtitle: "4 waiting · ~2 min to clear · routed to your channels",
 }
 
-export { decisionCards, openTasks, primaryNavigation, missionsHeader, workspaceNavigation }
-export type { DecisionCardData, NavigationItem, TaskItem }
+export { decisionCards, primaryNavigation, missionsHeader, workspaceNavigation }
+export type { DecisionCardData, NavigationItem }

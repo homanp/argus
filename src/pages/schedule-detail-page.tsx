@@ -13,7 +13,7 @@ import {
   type ScheduleDetailResponse,
   type ScheduleExecution,
 } from "@/lib/relay-api"
-import { humanCron, relativeTime, timeAgo } from "@/lib/schedule-utils"
+import { duration, humanCron, relativeTime, timeAgo } from "@/lib/schedule-utils"
 
 function syncNavbar(name: string, enabled: boolean) {
   const nameEl = document.getElementById("schedule-detail-name")
@@ -34,30 +34,48 @@ function clearNavbar() {
 }
 
 function ExecutionRow({ execution }: { execution: ScheduleExecution }) {
+  const [expanded, setExpanded] = useState(false)
+
   return (
-    <div className="flex w-full items-center gap-3 px-4 py-2.5">
-      <div
-        className={`size-1.5 shrink-0 rounded-full ${
-          execution.status === "completed" ? "bg-emerald-400/80" : "bg-rose-400/80"
-        }`}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-white/80">
-          {execution.status === "completed" ? "Executed" : "Failed"}
-          {execution.resultMessage && (
-            <span className="ml-1.5 text-white/30">{execution.resultMessage.slice(0, 80)}</span>
-          )}
-        </p>
-        <p className="text-[11px] text-white/30">
-          {timeAgo(execution.startedAt)}
-          {execution.finishedAt && execution.finishedAt !== execution.startedAt && (
-            <> · finished {timeAgo(execution.finishedAt)}</>
-          )}
-        </p>
-      </div>
-      <Badge size="sm" className="shrink-0">
-        {execution.status}
-      </Badge>
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/[0.02]"
+      >
+        <div
+          className={`size-1.5 shrink-0 rounded-full ${
+            execution.status === "completed"
+              ? "bg-emerald-400/80"
+              : execution.status === "running"
+                ? "bg-amber-400/80 animate-pulse"
+                : "bg-rose-400/80"
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] text-white/80">
+            {execution.status === "completed" ? "Executed" : execution.status === "running" ? "Running" : "Failed"}
+            {!expanded && execution.resultMessage && (
+              <span className="ml-1.5 text-white/30">{execution.resultMessage.slice(0, 80)}</span>
+            )}
+          </p>
+          <p className="text-[11px] text-white/30">
+            {timeAgo(execution.startedAt)}
+            {execution.finishedAt && execution.finishedAt !== execution.startedAt && (
+              <> · {duration(execution.startedAt, execution.finishedAt)}</>
+            )}
+          </p>
+        </div>
+        <span className="shrink-0 text-[11px] text-white/20">{expanded ? "collapse" : "expand"}</span>
+      </button>
+      {expanded && execution.resultMessage && (
+        <div className="border-t border-white/5 bg-white/[0.015] px-4 py-3">
+          <p className="mb-1.5 text-[11px] font-medium text-white/35">Agent response</p>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
+            {execution.resultMessage}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

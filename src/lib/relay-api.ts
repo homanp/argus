@@ -163,6 +163,17 @@ type ScheduleDetailResponse = {
   executions: ScheduleExecution[]
 }
 
+type RecentSession = {
+  id: string
+  type: "trigger" | "schedule"
+  sourceId: string
+  name: string
+  status: string
+  startedAt: string
+  finishedAt: string | null
+  resultMessage: string | null
+}
+
 const RELAY_BASE_URL = "http://127.0.0.1:8787"
 
 async function request<T>(path: string, init?: RequestInit) {
@@ -421,6 +432,10 @@ type ValidateResult = {
   checkedAt: string
 }
 
+async function getRecentSessions() {
+  return request<RecentSession[]>("/api/sessions/recent")
+}
+
 async function validateAgent() {
   return request<ValidateResult>("/api/agent/validate", {
     method: "POST",
@@ -445,6 +460,7 @@ export {
   getChannels,
   getGitHubAvailableEvents,
   getGitHubIntegration,
+  getRecentSessions,
   getScheduleExecutions,
   getSchedules,
   getTriggerExecutions,
@@ -472,6 +488,7 @@ export type {
   ValidateResult,
   GitHubIntegrationRepository,
   GitHubIntegrationState,
+  RecentSession,
   Schedule,
   ScheduleDetailResponse,
   ScheduleExecution,

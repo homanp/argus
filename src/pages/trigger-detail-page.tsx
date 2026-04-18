@@ -17,6 +17,7 @@ import {
   type TriggerDetailResponse,
   type TriggerExecution,
 } from "@/lib/relay-api"
+import { duration } from "@/lib/schedule-utils"
 
 function formatEventType(eventType: string) {
   return eventType.replaceAll("_", " ")
@@ -75,9 +76,9 @@ function ExecutionRow({ execution }: { execution: TriggerExecution }) {
             {execution.repositoryId && <span className="ml-1.5 text-white/30">#{execution.repositoryId}</span>}
           </p>
           <p className="text-[11px] text-white/30">
-            Matched {timeAgo(execution.matchedAt)}
-            {execution.receivedAt && <> · received {timeAgo(execution.receivedAt)}</>}
-            {execution.status !== "matched" && (
+            {timeAgo(execution.matchedAt)}
+            {execution.finishedAt && <> · {duration(execution.matchedAt, execution.finishedAt)}</>}
+            {execution.status !== "matched" && !execution.finishedAt && (
               <>
                 {" "}
                 ·{" "}
