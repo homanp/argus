@@ -1879,7 +1879,7 @@ app.get("/api/sessions/recent", async (_request, response) => {
     .from(scheduleExecutions)
     .leftJoin(schedules, eq(scheduleExecutions.scheduleId, schedules.id))
     .orderBy(desc(scheduleExecutions.startedAt))
-    .limit(5)
+    .limit(20)
     .all()
 
   const combined = [
