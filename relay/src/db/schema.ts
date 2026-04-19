@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
 const timestamps = {
   createdAt: text("created_at").notNull(),
@@ -120,6 +120,48 @@ const scheduleExecutions = sqliteTable("schedule_executions", {
   resultMessage: text("result_message"),
 })
 
+const missions = sqliteTable("missions", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull().default("awaiting_decision"),
+  priority: text("priority").notNull().default("normal"),
+  urgent: integer("urgent", { mode: "boolean" }).notNull().default(false),
+  sourceProvider: text("source_provider").notNull(),
+  sourceEventType: text("source_event_type").notNull(),
+  triggerWebhookEventId: integer("trigger_webhook_event_id"),
+  title: text("title").notNull(),
+  analysisMarkdown: text("analysis_markdown").notNull(),
+  recommendation: text("recommendation").notNull(),
+  confidence: real("confidence").notNull().default(0),
+  confidenceLabel: text("confidence_label"),
+  agentName: text("agent_name"),
+  channelHint: text("channel_hint"),
+  planJson: text("plan_json").notNull(),
+  actionsJson: text("actions_json").notNull(),
+  metadataJson: text("metadata_json").notNull(),
+  decidedActionKey: text("decided_action_key"),
+  decidedAt: text("decided_at"),
+  ...timestamps,
+})
+
+const missionSignals = sqliteTable("mission_signals", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  missionId: text("mission_id").notNull(),
+  webhookEventId: integer("webhook_event_id").notNull(),
+  label: text("label"),
+  createdAt: text("created_at").notNull(),
+})
+
+const missionExecutions = sqliteTable("mission_executions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  missionId: text("mission_id").notNull(),
+  actionKey: text("action_key").notNull(),
+  promptSent: text("prompt_sent").notNull(),
+  status: text("status").notNull().default("pending"),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  resultMessage: text("result_message"),
+})
+
 const agent = sqliteTable("agent", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -139,6 +181,9 @@ export {
   githubRepositories,
   githubWebhookEvents,
   integrations,
+  missionExecutions,
+  missionSignals,
+  missions,
   scheduleExecutions,
   schedules,
   triggerDeliveryAttempts,

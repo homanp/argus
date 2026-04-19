@@ -35,6 +35,7 @@ import ChannelDetailPage from "@/pages/channel-detail-page"
 import ChannelsPage from "@/pages/channels-page"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
 import IntegrationsPage from "@/pages/integrations-page"
+import MissionDetailPage from "@/pages/mission-detail-page"
 import ScheduleDetailPage from "@/pages/schedule-detail-page"
 import SchedulesPage from "@/pages/schedules-page"
 import TriggerDetailPage from "@/pages/trigger-detail-page"
@@ -84,6 +85,7 @@ function RootLayout() {
   const isChannelsDetail = pathname.startsWith("/channels/") && pathname !== "/channels"
   const isSchedulesRoute = pathname === "/schedules" || pathname.startsWith("/schedules/")
   const isSchedulesDetail = pathname.startsWith("/schedules/") && pathname !== "/schedules"
+  const isMissionDetail = pathname.startsWith("/missions/")
   const header = pathname.startsWith("/connectors/")
     ? {
         title: "Connector detail",
@@ -108,7 +110,13 @@ function RootLayout() {
               subtitle: "Configuration and execution history",
               icon: Calendar03Icon,
             }
-          : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
+          : isMissionDetail
+            ? {
+                title: "Mission detail",
+                subtitle: "Analysis, plan, signals, and decision",
+                icon: ActivitySparkIcon,
+              }
+            : (routeHeaderMap[pathname as keyof typeof routeHeaderMap] ?? routeHeaderMap["/"])
 
   const providerSlug =
     pathname.startsWith("/connectors/") || pathname.startsWith("/channels/")
@@ -128,16 +136,18 @@ function RootLayout() {
         <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent">
           <header className="z-10 mt-2 flex h-11 shrink-0 items-center justify-between bg-transparent px-6 backdrop-blur-xl md:px-8">
             <div className="flex min-w-0 items-center gap-2">
-              {providerTitle || isTriggersDetail || isSchedulesDetail ? (
+              {providerTitle || isTriggersDetail || isSchedulesDetail || isMissionDetail ? (
                 <Link
                   to={
-                    isSchedulesDetail
-                      ? "/schedules"
-                      : isTriggersDetail
-                        ? "/triggers"
-                        : isChannelsDetail
-                          ? "/channels"
-                          : "/connectors"
+                    isMissionDetail
+                      ? "/"
+                      : isSchedulesDetail
+                        ? "/schedules"
+                        : isTriggersDetail
+                          ? "/triggers"
+                          : isChannelsDetail
+                            ? "/channels"
+                            : "/connectors"
                   }
                   className="flex size-6 items-center justify-center rounded-md border border-white/10 text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/80"
                 >
@@ -226,6 +236,20 @@ function RootLayout() {
                         />
                       </>
                     ) : null}
+                  </>
+                ) : isMissionDetail ? (
+                  <>
+                    <Link to="/" className="font-medium text-white/45 transition-colors hover:text-white/70">
+                      Missions
+                    </Link>
+                    <span className="text-white/20">/</span>
+                    <p id="mission-detail-name" className="truncate font-medium text-white">
+                      Detail
+                    </p>
+                    <span
+                      id="mission-detail-status"
+                      className={`ml-1 hidden ${badgeVariants({ size: "sm", variant: "neutral" })}`}
+                    />
                   </>
                 ) : (
                   <>
@@ -394,6 +418,15 @@ function RootLayout() {
                   </Button>
                 </>
               )}
+              {isMissionDetail && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.dispatchEvent(new CustomEvent("argus:dismiss-mission"))}
+                  className="border-white/10 bg-transparent text-[11px] font-normal text-rose-300/60 hover:bg-rose-400/10 hover:text-rose-300"
+                >
+                  Dismiss
+                </Button>
+              )}
             </div>
           </header>
 
@@ -470,6 +503,12 @@ const scheduleDetailRoute = createRoute({
   component: ScheduleDetailPage,
 })
 
+const missionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/missions/$missionId",
+  component: MissionDetailPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   connectorsRoute,
@@ -480,6 +519,7 @@ const routeTree = rootRoute.addChildren([
   triggerDetailRoute,
   schedulesRoute,
   scheduleDetailRoute,
+  missionDetailRoute,
   agentsRoute,
 ])
 

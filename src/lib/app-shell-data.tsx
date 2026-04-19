@@ -206,8 +206,23 @@ const decisionCards: DecisionCardData[] = [
 
 const missionsHeader = {
   title: "Missions",
-  subtitle: "4 waiting · ~2 min to clear · routed to your channels",
+  subtitle: "Agent-generated decisions waiting on you",
 }
 
-export { decisionCards, primaryNavigation, missionsHeader, workspaceNavigation }
-export type { DecisionCardData, NavigationItem }
+const PROVIDER_ICON_MAP: Record<string, AppIcon> = {
+  stripe: StripeIcon,
+  github: Github01Icon,
+  calendar: Calendar03Icon,
+  flights: Airplane01Icon,
+  slack: SlackIcon,
+  email: Mail01Icon,
+  gmail: Mail01Icon,
+}
+
+function iconForProvider(provider: string): AppIcon {
+  const key = provider.toLowerCase()
+  return PROVIDER_ICON_MAP[key] ?? ConnectIcon
+}
+
+export { PROVIDER_ICON_MAP, decisionCards, iconForProvider, missionsHeader, primaryNavigation, workspaceNavigation }
+export type { AppIcon, DecisionCardData, NavigationItem }

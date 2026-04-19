@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 
+import { extractAgentJson } from "./agent-json.js"
 import * as schema from "./db/schema.js"
 import { triggerDeliveryAttempts } from "./db/schema.js"
 
@@ -8,6 +9,13 @@ type DB = BetterSQLite3Database<typeof schema>
 
 type ChannelRow = typeof schema.channels.$inferSelect
 type TriggerRow = typeof schema.triggers.$inferSelect
+
+type ChannelButton = {
+  label: string
+  url: string
+  /** Slack styling: "primary" (green) or "danger" (red). Anything else renders default. */
+  style?: "primary" | "danger"
+}
 
 type DeliveryNotification = {
   trigger: TriggerRow
@@ -19,6 +27,7 @@ type DeliveryNotification = {
   channelSummary?: string | null
   actionNeeded?: boolean | null
   commentNeeded?: boolean | null
+  buttons?: ChannelButton[] | null
 }
 
 type DeliveryResult = {
@@ -32,46 +41,48 @@ type StructuredAgentResult = {
   channelSummary?: string
   actionNeeded?: boolean
   commentNeeded?: boolean
+  buttons?: ChannelButton[]
 }
 
-function cleanAgentText(raw: string) {
-  const trimmed = raw.trim()
-  if (trimmed.startsWith("```")) {
-    return trimmed
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim()
+// Slack caps an actions block at 5 elements and a button label at ~75 chars.
+// We clamp a bit tighter for safety and to keep messages visually tidy.
+const MAX_BUTTONS = 5
+const MAX_BUTTON_LABEL = 60
+
+function parseButtons(raw: unknown): ChannelButton[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: ChannelButton[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const obj = item as Partial<ChannelButton>
+    const label = typeof obj.label === "string" ? obj.label.trim() : ""
+    const url = typeof obj.url === "string" ? obj.url.trim() : ""
+    if (!label || !url) continue
+    // Only allow http(s) URLs so we don't accidentally render `javascript:` etc.
+    if (!/^https?:\/\//i.test(url)) continue
+    const style = obj.style === "primary" || obj.style === "danger" ? obj.style : undefined
+    out.push({
+      label: label.length > MAX_BUTTON_LABEL ? `${label.slice(0, MAX_BUTTON_LABEL - 1)}…` : label,
+      url,
+      ...(style ? { style } : {}),
+    })
+    if (out.length >= MAX_BUTTONS) break
   }
-  return trimmed
+  return out.length > 0 ? out : undefined
 }
 
 function parseStructuredAgentResult(raw: string): StructuredAgentResult | null {
-  const cleaned = cleanAgentText(raw)
+  const parsed = extractAgentJson<Partial<StructuredAgentResult>>(raw)
+  if (!parsed || typeof parsed !== "object" || typeof parsed.review !== "string") return null
 
-  const attempts = [cleaned]
-  const objectMatch = cleaned.match(/\{[\s\S]*\}/)
-  if (objectMatch && objectMatch[0] !== cleaned) {
-    attempts.push(objectMatch[0])
+  return {
+    review: parsed.review.trim(),
+    channelTitle: typeof parsed.channelTitle === "string" ? parsed.channelTitle.trim() : undefined,
+    channelSummary: typeof parsed.channelSummary === "string" ? parsed.channelSummary.trim() : undefined,
+    actionNeeded: typeof parsed.actionNeeded === "boolean" ? parsed.actionNeeded : undefined,
+    commentNeeded: typeof parsed.commentNeeded === "boolean" ? parsed.commentNeeded : undefined,
+    buttons: parseButtons(parsed.buttons),
   }
-
-  for (const candidate of attempts) {
-    try {
-      const parsed = JSON.parse(candidate) as Partial<StructuredAgentResult>
-      if (!parsed || typeof parsed !== "object" || typeof parsed.review !== "string") continue
-
-      return {
-        review: parsed.review.trim(),
-        channelTitle: typeof parsed.channelTitle === "string" ? parsed.channelTitle.trim() : undefined,
-        channelSummary: typeof parsed.channelSummary === "string" ? parsed.channelSummary.trim() : undefined,
-        actionNeeded: typeof parsed.actionNeeded === "boolean" ? parsed.actionNeeded : undefined,
-        commentNeeded: typeof parsed.commentNeeded === "boolean" ? parsed.commentNeeded : undefined,
-      }
-    } catch {
-      // try next parse strategy
-    }
-  }
-
-  return null
 }
 
 function extractPrimaryLink(payload: Record<string, unknown>) {
@@ -171,6 +182,75 @@ function parseConfig<T>(row: ChannelRow): T | null {
   }
 }
 
+type SlackBlock =
+  | { type: "header"; text: { type: "plain_text"; text: string; emoji?: boolean } }
+  | { type: "section"; text: { type: "mrkdwn"; text: string } }
+  | { type: "context"; elements: Array<{ type: "mrkdwn"; text: string }> }
+  | {
+      type: "actions"
+      elements: Array<{
+        type: "button"
+        text: { type: "plain_text"; text: string; emoji?: boolean }
+        url: string
+        style?: "primary" | "danger"
+      }>
+    }
+  | { type: "divider" }
+
+function buildSlackBlocks(notification: DeliveryNotification): SlackBlock[] {
+  const blocks: SlackBlock[] = []
+
+  const title = notification.channelTitle?.trim() || buildFallbackTitle(notification)
+  blocks.push({
+    type: "header",
+    text: { type: "plain_text", text: title.slice(0, 150), emoji: true },
+  })
+
+  const summary = notification.channelSummary?.trim() || buildFallbackSummary(notification)
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: summary.slice(0, 2900) },
+  })
+
+  const context: string[] = []
+  if (notification.actionNeeded !== undefined && notification.actionNeeded !== null) {
+    context.push(`*Action needed:* ${notification.actionNeeded ? "Yes" : "No"}`)
+  }
+  if (notification.commentNeeded !== undefined && notification.commentNeeded !== null) {
+    context.push(`*GitHub comment:* ${notification.commentNeeded ? "Needed" : "None"}`)
+  }
+  context.push(`*Source:* \`${notification.sourceProvider}/${notification.eventType}\``)
+  if (context.length > 0) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: context.join("  ·  ") }],
+    })
+  }
+
+  // Buttons: merge agent-emitted buttons with a default "View source" link so
+  // there is always a useful jump-off point even when the agent omits them.
+  const buttons = [...(notification.buttons ?? [])]
+  const primaryLink = extractPrimaryLink(notification.payload)
+  const hasSourceLink = buttons.some((b) => primaryLink && b.url === primaryLink)
+  if (primaryLink && !hasSourceLink && buttons.length < MAX_BUTTONS) {
+    buttons.push({ label: "View source", url: primaryLink })
+  }
+
+  if (buttons.length > 0) {
+    blocks.push({
+      type: "actions",
+      elements: buttons.map((button) => ({
+        type: "button" as const,
+        text: { type: "plain_text" as const, text: button.label, emoji: true },
+        url: button.url,
+        ...(button.style ? { style: button.style } : {}),
+      })),
+    })
+  }
+
+  return blocks
+}
+
 async function postSlack(notification: DeliveryNotification, row: ChannelRow): Promise<DeliveryResult> {
   const config = parseConfig<{ botToken?: string; channelId?: string }>(row)
   if (!config?.botToken || !config.channelId) {
@@ -185,7 +265,10 @@ async function postSlack(notification: DeliveryNotification, row: ChannelRow): P
     },
     body: JSON.stringify({
       channel: config.channelId,
+      // `text` is used as the notification/push preview and as a fallback for
+      // clients that can't render blocks. Blocks carry the rich layout.
       text: buildPlainText(notification),
+      blocks: buildSlackBlocks(notification),
     }),
   })
 
@@ -384,4 +467,4 @@ async function deliverNotification(
 }
 
 export { deliverNotification, parseStructuredAgentResult }
-export type { DeliveryNotification, StructuredAgentResult }
+export type { ChannelButton, DeliveryNotification, StructuredAgentResult }

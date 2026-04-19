@@ -5,6 +5,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Badge, badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { JsonView, tryParseJson } from "@/components/ui/json-view"
 import { TriggerSheet } from "@/components/trigger-sheet"
 import {
   deleteTrigger,
@@ -96,17 +97,22 @@ function ExecutionRow({ execution }: { execution: TriggerExecution }) {
           {execution.resultMessage && (
             <div>
               <p className="mb-1.5 text-[11px] font-medium text-white/35">Agent response</p>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
-                {execution.resultMessage}
-              </pre>
+              <JsonView
+                value={tryParseJson(execution.resultMessage) ?? execution.resultMessage}
+                maxHeightClassName="max-h-64"
+                preClassName="rounded-md border border-white/8"
+              />
             </div>
           )}
           {execution.payload && (
             <div>
               <p className="mb-1.5 text-[11px] font-medium text-white/35">Webhook payload</p>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-white/55">
-                {JSON.stringify(execution.payload, null, 2)}
-              </pre>
+              <JsonView
+                value={execution.payload}
+                comment={execution.eventType ? `${execution.eventType}` : undefined}
+                maxHeightClassName="max-h-64"
+                preClassName="rounded-md border border-white/8"
+              />
             </div>
           )}
         </div>

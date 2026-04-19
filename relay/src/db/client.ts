@@ -140,6 +140,49 @@ function createDatabase(databasePath: string) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS missions (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'awaiting_decision',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      urgent INTEGER NOT NULL DEFAULT 0,
+      source_provider TEXT NOT NULL,
+      source_event_type TEXT NOT NULL,
+      trigger_webhook_event_id INTEGER,
+      title TEXT NOT NULL,
+      analysis_markdown TEXT NOT NULL,
+      recommendation TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 0,
+      confidence_label TEXT,
+      agent_name TEXT,
+      channel_hint TEXT,
+      plan_json TEXT NOT NULL,
+      actions_json TEXT NOT NULL,
+      metadata_json TEXT NOT NULL,
+      decided_action_key TEXT,
+      decided_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mission_id TEXT NOT NULL,
+      webhook_event_id INTEGER NOT NULL,
+      label TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_executions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mission_id TEXT NOT NULL,
+      action_key TEXT NOT NULL,
+      prompt_sent TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      result_message TEXT
+    );
   `)
 
   const repoColumns = sqlite.pragma("table_info(github_repositories)") as { name: string }[]

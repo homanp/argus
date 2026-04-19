@@ -165,13 +165,89 @@ type ScheduleDetailResponse = {
 
 type RecentSession = {
   id: string
-  type: "trigger" | "schedule"
+  type: "trigger" | "schedule" | "mission"
   sourceId: string
   name: string
   status: string
   startedAt: string
   finishedAt: string | null
   resultMessage: string | null
+}
+
+type MissionActionSummary = {
+  key: string
+  label: string
+  hotkey: string
+}
+
+type MissionSummary = {
+  id: string
+  status: "awaiting_decision" | "decided" | "dismissed" | string
+  priority: "low" | "normal" | "high" | string
+  urgent: boolean
+  sourceProvider: string
+  sourceEventType: string
+  title: string
+  recommendation: string
+  analysisMarkdown: string
+  confidence: number
+  confidenceLabel: string | null
+  agentName: string | null
+  decidedActionKey: string | null
+  decidedAt: string | null
+  createdAt: string
+  updatedAt: string
+  actions: MissionActionSummary[]
+  actionLabels: string[]
+}
+
+type MissionPlanStep = {
+  step: number
+  description: string
+  tool: string
+  estimate: string
+  reversibility: "reversible" | "auto" | "attention"
+  reversibilityLabel?: string
+}
+
+type MissionAction = {
+  key: string
+  label: string
+  hotkey: string
+  actionPrompt: string
+}
+
+type Mission = MissionSummary & {
+  plan: MissionPlanStep[]
+  actions: MissionAction[]
+}
+
+type MissionSignal = {
+  id: number
+  label: string | null
+  createdAt: string
+  webhookEventId: number | null
+  eventType: string | null
+  source: string | null
+  repositoryId: string | null
+  payload: Record<string, unknown> | null
+  receivedAt: string | null
+}
+
+type MissionExecution = {
+  id: number
+  actionKey: string
+  promptSent: string
+  status: "pending" | "running" | "completed" | "failed" | string
+  startedAt: string
+  finishedAt: string | null
+  resultMessage: string | null
+}
+
+type MissionDetailResponse = {
+  mission: Mission
+  signals: MissionSignal[]
+  executions: MissionExecution[]
 }
 
 const RELAY_BASE_URL = "http://127.0.0.1:8787"
@@ -436,6 +512,33 @@ async function getRecentSessions() {
   return request<RecentSession[]>("/api/sessions/recent")
 }
 
+async function getMissions() {
+  return request<MissionSummary[]>("/api/missions")
+}
+
+async function getMission(missionId: string) {
+  return request<MissionDetailResponse>(`/api/missions/${missionId}`)
+}
+
+async function decideMission(missionId: string, actionKey: string) {
+  return request<{ ok: true; actionKey: string }>(`/api/missions/${missionId}/decide`, {
+    method: "POST",
+    body: JSON.stringify({ actionKey }),
+  })
+}
+
+async function dismissMission(missionId: string) {
+  return request<{ ok: true }>(`/api/missions/${missionId}/dismiss`, {
+    method: "POST",
+  })
+}
+
+async function deleteMission(missionId: string) {
+  return request<{ ok: true }>(`/api/missions/${missionId}`, {
+    method: "DELETE",
+  })
+}
+
 async function validateAgent() {
   return request<ValidateResult>("/api/agent/validate", {
     method: "POST",
@@ -451,15 +554,20 @@ export {
   connectGitHub,
   createSchedule,
   createTrigger,
+  decideMission,
+  deleteMission,
   detectAgents,
   deleteSchedule,
   deleteTrigger,
   discoverTelegramChats,
+  dismissMission,
   getAgent,
   getChannel,
   getChannels,
   getGitHubAvailableEvents,
   getGitHubIntegration,
+  getMission,
+  getMissions,
   getRecentSessions,
   getScheduleExecutions,
   getSchedules,
@@ -484,6 +592,13 @@ export type {
   ChannelProvider,
   ChannelState,
   DetectedAgent,
+  Mission,
+  MissionAction,
+  MissionDetailResponse,
+  MissionExecution,
+  MissionPlanStep,
+  MissionSignal,
+  MissionSummary,
   TelegramDiscoveryResponse,
   ValidateResult,
   GitHubIntegrationRepository,

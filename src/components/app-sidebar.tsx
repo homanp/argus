@@ -17,7 +17,7 @@ import {
   SidebarResizeHandle,
 } from "@/components/ui/sidebar"
 import { primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
-import { getAgent, getChannels, getRecentSessions, getSchedules, getTriggers } from "@/lib/relay-api"
+import { getAgent, getChannels, getMissions, getRecentSessions, getSchedules, getTriggers } from "@/lib/relay-api"
 import type { RecentSession } from "@/lib/relay-api"
 import { timeAgo } from "@/lib/schedule-utils"
 import { cn } from "@/lib/utils"
@@ -32,6 +32,7 @@ function AppSidebar() {
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   const [channelCount, setChannelCount] = useState<number | null>(null)
   const [scheduleCount, setScheduleCount] = useState<number | null>(null)
+  const [missionCount, setMissionCount] = useState<number | null>(null)
   const [agentConfigured, setAgentConfigured] = useState<boolean | null>(null)
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
   const [sessionsExpanded, setSessionsExpanded] = useState(false)
@@ -51,6 +52,11 @@ function AppSidebar() {
     getChannels()
       .then((data) => {
         if (!cancelled) setChannelCount(data.filter((item) => item.status === "connected").length)
+      })
+      .catch(() => {})
+    getMissions()
+      .then((data) => {
+        if (!cancelled) setMissionCount(data.filter((item) => item.status === "awaiting_decision").length)
       })
       .catch(() => {})
     getAgent()
@@ -80,6 +86,17 @@ function AppSidebar() {
     }
   }, [])
 
+  const resolvedPrimaryNav = useMemo(
+    () =>
+      primaryNavigation.map((item) => {
+        if (item.title === "Missions" && missionCount !== null) {
+          return { ...item, count: String(missionCount) }
+        }
+        return item
+      }),
+    [missionCount],
+  )
+
   const resolvedWorkspaceNav = useMemo(
     () =>
       workspaceNavigation.map((item) => {
@@ -97,7 +114,7 @@ function AppSidebar() {
       <SidebarContent className="pt-1 pb-2">
         <SidebarGroup className="pt-0">
           <SidebarMenu>
-            {primaryNavigation.map((item) => (
+            {resolvedPrimaryNav.map((item) => (
               <SidebarMenuItem key={item.title}>
                 {item.href ? (
                   <SidebarMenuButton
@@ -192,7 +209,9 @@ function AppSidebar() {
                       onClick={() =>
                         session.type === "trigger"
                           ? navigate({ to: "/triggers/$triggerId", params: { triggerId: session.sourceId } })
-                          : navigate({ to: "/schedules/$scheduleId", params: { scheduleId: session.sourceId } })
+                          : session.type === "mission"
+                            ? navigate({ to: "/missions/$missionId", params: { missionId: session.sourceId } })
+                            : navigate({ to: "/schedules/$scheduleId", params: { scheduleId: session.sourceId } })
                       }
                       className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
                     >

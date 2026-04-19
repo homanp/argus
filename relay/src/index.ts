@@ -7,7 +7,12 @@ import express from "express"
 import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
 import { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, runAgent } from "./agent.js"
-import { deliverNotification, parseStructuredAgentResult, type DeliveryNotification } from "./delivery.js"
+import {
+  deliverNotification,
+  parseStructuredAgentResult,
+  type ChannelButton,
+  type DeliveryNotification,
+} from "./delivery.js"
 import { createDatabase } from "./db/client.js"
 import {
   agent as agentTable,
@@ -15,12 +20,17 @@ import {
   githubRepositories,
   githubWebhookEvents,
   integrations,
+  missionExecutions,
+  missionSignals,
+  missions,
   scheduleExecutions,
   schedules,
   triggerDeliveryAttempts,
   triggerExecutions,
   triggers,
 } from "./db/schema.js"
+import { deleteMissionCascade, generateMission } from "./missions.js"
+import { seedDemoMissions } from "./missions-seed.js"
 import { startScheduler, computeNextRunAt, isValidCron } from "./scheduler.js"
 import { startTunnel, stopTunnel } from "./tunnel.js"
 
@@ -488,6 +498,33 @@ async function deleteGitHubWebhook(apiKey: string, owner: string, repo: string, 
   }
 }
 
+/**
+ * Finds a webhook that was manually added on GitHub (URL contains this repo's
+ * `webhookKey`) and returns its hook id so we can start managing it.
+ *
+ * This is the "adopt" path: users who pasted the payload URL into GitHub by
+ * hand never populated `github_webhook_id` in our DB, so tunnel-URL rotation
+ * couldn't PATCH their hook. With this, the next sync adopts it.
+ */
+async function findExistingGitHubWebhookId(
+  apiKey: string,
+  owner: string,
+  repo: string,
+  webhookKey: string,
+): Promise<number | null> {
+  try {
+    const hooks = await githubRequest<GitHubHook[]>(apiKey, `/repos/${owner}/${repo}/hooks`)
+    for (const hook of hooks) {
+      if (hook.config?.url?.includes(`/webhooks/github/${webhookKey}`)) {
+        return hook.id
+      }
+    }
+  } catch {
+    // PAT might lack `admin:repo_hook` — caller falls back to create.
+  }
+  return null
+}
+
 async function syncAllWebhookUrls() {
   const [integration]: IntegrationRow[] = await db
     .select()
@@ -502,18 +539,36 @@ async function syncAllWebhookUrls() {
     .where(and(eq(githubRepositories.integrationId, integration.id), eq(githubRepositories.isSelected, true)))
 
   let updated = 0
+  let adopted = 0
 
   for (const repo of repos) {
     if (!repo.webhookKey || !repo.webhookSecret) continue
 
     const webhookUrl = `${config.relayBaseUrl}/webhooks/github/${repo.webhookKey}`
 
-    if (repo.githubWebhookId) {
+    // If we don't already know this repo's hook id, see if one exists on
+    // GitHub with our webhookKey in the URL — adopt it so we can PATCH it
+    // across future tunnel-URL changes.
+    let hookId = repo.githubWebhookId
+    if (!hookId) {
+      const existing = await findExistingGitHubWebhookId(integration.apiKey, repo.owner, repo.name, repo.webhookKey)
+      if (existing) {
+        hookId = existing
+        await db
+          .update(githubRepositories)
+          .set({ githubWebhookId: existing, webhookStatus: "active", updatedAt: now() })
+          .where(eq(githubRepositories.id, repo.id))
+        adopted += 1
+        console.log(`Adopted existing GitHub webhook ${existing} for ${repo.fullName}`)
+      }
+    }
+
+    if (hookId) {
       const success = await updateGitHubWebhookUrl(
         integration.apiKey,
         repo.owner,
         repo.name,
-        repo.githubWebhookId,
+        hookId,
         webhookUrl,
         repo.webhookSecret,
       )
@@ -537,25 +592,25 @@ async function syncAllWebhookUrls() {
         }
       }
     } else {
-      const hookId = await createGitHubWebhook(
+      const newHookId = await createGitHubWebhook(
         integration.apiKey,
         repo.owner,
         repo.name,
         webhookUrl,
         repo.webhookSecret,
       )
-      if (hookId) {
+      if (newHookId) {
         await db
           .update(githubRepositories)
-          .set({ githubWebhookId: hookId, webhookStatus: "active", updatedAt: now() })
+          .set({ githubWebhookId: newHookId, webhookStatus: "active", updatedAt: now() })
           .where(eq(githubRepositories.id, repo.id))
         updated += 1
       }
     }
   }
 
-  if (updated > 0) {
-    console.log(`Updated ${updated} webhook(s) to ${config.relayBaseUrl}`)
+  if (adopted > 0 || updated > 0) {
+    console.log(`Synced ${updated} webhook URL(s) (${adopted} adopted) to ${config.relayBaseUrl}`)
   }
 }
 
@@ -806,18 +861,40 @@ async function setRepositorySelected(repositoryId: string, enabled: boolean) {
 
     if (integration.apiKey) {
       const webhookUrl = `${config.relayBaseUrl}/webhooks/github/${webhookKey}`
-      const hookId = await createGitHubWebhook(
+
+      // Prefer adopting a matching hook the user already pasted into GitHub
+      // — avoids duplicate hooks when the PAT later gets admin:repo_hook.
+      const existing = await findExistingGitHubWebhookId(
         integration.apiKey,
         repository.owner,
         repository.name,
-        webhookUrl,
-        webhookSecret,
+        webhookKey,
       )
-      if (hookId) {
-        updates.githubWebhookId = hookId
+      if (existing) {
+        await updateGitHubWebhookUrl(
+          integration.apiKey,
+          repository.owner,
+          repository.name,
+          existing,
+          webhookUrl,
+          webhookSecret,
+        )
+        updates.githubWebhookId = existing
         updates.webhookStatus = "active"
       } else {
-        updates.webhookStatus = "ready"
+        const hookId = await createGitHubWebhook(
+          integration.apiKey,
+          repository.owner,
+          repository.name,
+          webhookUrl,
+          webhookSecret,
+        )
+        if (hookId) {
+          updates.githubWebhookId = hookId
+          updates.webhookStatus = "active"
+        } else {
+          updates.webhookStatus = "ready"
+        }
       }
     } else {
       updates.webhookStatus = "ready"
@@ -875,6 +952,15 @@ async function recordWebhookEvent({
 
   if (inserted) {
     await evaluateTriggers(inserted.id, "github", eventType, payload)
+
+    void generateMission(db, {
+      webhookEventId: inserted.id,
+      provider: "github",
+      eventType,
+      payload,
+    }).catch((err) => {
+      console.error(`[missions] generation failed for event ${inserted.id}:`, err)
+    })
   }
 }
 
@@ -976,11 +1062,16 @@ function buildTriggerContext(
           channelSummary: "plain English summary for a human reading the channel message",
           actionNeeded: false,
           commentNeeded: false,
+          buttons: [
+            { label: "View issue", url: "https://…", style: "primary" },
+            { label: "Open PR", url: "https://…" },
+          ],
         },
         null,
         2,
       ),
       `Keep channelSummary concise and easy to skim in Telegram or Slack.`,
+      `"buttons" is optional — include 0-4 link buttons pointing at the most useful URLs from the event payload (issue, PR, commit, dashboard, etc.). Each button is { label, url, style? }. Only http(s) URLs are allowed. "style" may be "primary" (green) or "danger" (red); omit for neutral. Slack will render these as clickable buttons; other channels ignore them.`,
     )
   }
 
@@ -1026,6 +1117,7 @@ async function evaluateTriggers(
           channelSummary?: string
           actionNeeded?: boolean
           commentNeeded?: boolean
+          buttons?: ChannelButton[]
         } | null,
       ) => {
         if (channelTargets.length === 0) return
@@ -1040,6 +1132,7 @@ async function evaluateTriggers(
           channelSummary: structured?.channelSummary ?? null,
           actionNeeded: structured?.actionNeeded ?? null,
           commentNeeded: structured?.commentNeeded ?? null,
+          buttons: structured?.buttons ?? null,
         }
 
         await deliverNotification(db, execution.id, channelTargets, notification, new Date().toISOString())
@@ -1847,6 +1940,195 @@ app.get("/api/schedules/:scheduleId/executions", async (request, response) => {
   })
 })
 
+// --- Missions ---
+
+type MissionRow = typeof missions.$inferSelect
+
+function parseMissionPlan(row: MissionRow) {
+  try {
+    return JSON.parse(row.planJson) as unknown[]
+  } catch {
+    return []
+  }
+}
+
+function parseMissionActions(row: MissionRow) {
+  try {
+    return JSON.parse(row.actionsJson) as Array<{ key: string; label: string; hotkey: string; actionPrompt: string }>
+  } catch {
+    return []
+  }
+}
+
+function serializeMissionSummary(row: MissionRow) {
+  const actions = parseMissionActions(row)
+  return {
+    id: row.id,
+    status: row.status,
+    priority: row.priority,
+    urgent: Boolean(row.urgent),
+    sourceProvider: row.sourceProvider,
+    sourceEventType: row.sourceEventType,
+    title: row.title,
+    recommendation: row.recommendation,
+    analysisMarkdown: row.analysisMarkdown,
+    confidence: row.confidence,
+    confidenceLabel: row.confidenceLabel ?? null,
+    agentName: row.agentName ?? null,
+    decidedActionKey: row.decidedActionKey ?? null,
+    decidedAt: row.decidedAt ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    // Summary-safe action list (no prompts — kept out of the list payload
+    // to avoid shipping full agent prompts across the wire).
+    actions: actions.map((action) => ({ key: action.key, label: action.label, hotkey: action.hotkey })),
+    actionLabels: actions.map((action) => action.label),
+  }
+}
+
+app.get("/api/missions", async (_request, response) => {
+  const rows: MissionRow[] = await db.select().from(missions).orderBy(desc(missions.createdAt))
+  response.json(rows.map(serializeMissionSummary))
+})
+
+app.get("/api/missions/:missionId", async (request, response) => {
+  const [row]: MissionRow[] = await db.select().from(missions).where(eq(missions.id, request.params.missionId))
+
+  if (!row) {
+    response.status(404).json({ error: "Mission not found." })
+    return
+  }
+
+  const signalRows = await db
+    .select({
+      id: missionSignals.id,
+      label: missionSignals.label,
+      createdAt: missionSignals.createdAt,
+      webhookEventId: githubWebhookEvents.id,
+      eventType: githubWebhookEvents.eventType,
+      source: githubWebhookEvents.source,
+      repositoryId: githubWebhookEvents.repositoryId,
+      payloadJson: githubWebhookEvents.payloadJson,
+      receivedAt: githubWebhookEvents.receivedAt,
+    })
+    .from(missionSignals)
+    .leftJoin(githubWebhookEvents, eq(missionSignals.webhookEventId, githubWebhookEvents.id))
+    .where(eq(missionSignals.missionId, row.id))
+    .orderBy(missionSignals.createdAt)
+
+  const executionRows = await db
+    .select()
+    .from(missionExecutions)
+    .where(eq(missionExecutions.missionId, row.id))
+    .orderBy(desc(missionExecutions.startedAt))
+
+  response.json({
+    mission: {
+      ...serializeMissionSummary(row),
+      plan: parseMissionPlan(row),
+      actions: parseMissionActions(row),
+    },
+    signals: signalRows.map((signal) => ({
+      id: signal.id,
+      label: signal.label ?? null,
+      createdAt: signal.createdAt,
+      webhookEventId: signal.webhookEventId ?? null,
+      eventType: signal.eventType ?? null,
+      source: signal.source ?? null,
+      repositoryId: signal.repositoryId ?? null,
+      payload: signal.payloadJson ? JSON.parse(signal.payloadJson) : null,
+      receivedAt: signal.receivedAt ?? null,
+    })),
+    executions: executionRows.map((execution) => ({
+      id: execution.id,
+      actionKey: execution.actionKey,
+      promptSent: execution.promptSent,
+      status: execution.status,
+      startedAt: execution.startedAt,
+      finishedAt: execution.finishedAt ?? null,
+      resultMessage: execution.resultMessage ?? null,
+    })),
+  })
+})
+
+app.post("/api/missions/:missionId/decide", express.json(), async (request, response) => {
+  const [row]: MissionRow[] = await db.select().from(missions).where(eq(missions.id, request.params.missionId))
+
+  if (!row) {
+    response.status(404).json({ error: "Mission not found." })
+    return
+  }
+
+  const actionKey = typeof request.body?.actionKey === "string" ? request.body.actionKey.trim() : ""
+  if (!actionKey) {
+    response.status(400).json({ error: "actionKey is required." })
+    return
+  }
+
+  const actions = parseMissionActions(row)
+  const chosen = actions.find((action) => action.key === actionKey)
+  if (!chosen) {
+    response.status(400).json({ error: `Unknown actionKey "${actionKey}" for mission.` })
+    return
+  }
+
+  const timestamp = now()
+
+  await db
+    .update(missions)
+    .set({
+      status: "decided",
+      decidedActionKey: actionKey,
+      decidedAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .where(eq(missions.id, row.id))
+
+  await db.insert(missionExecutions).values({
+    missionId: row.id,
+    actionKey,
+    promptSent: chosen.actionPrompt,
+    // TODO: dispatch promptSent to runAgent here and flip status to "running"
+    // once mission action execution is wired to the configured coding agent.
+    status: "pending",
+    startedAt: timestamp,
+  })
+
+  response.json({ ok: true, actionKey })
+})
+
+app.post("/api/missions/:missionId/dismiss", async (request, response) => {
+  const [row]: MissionRow[] = await db.select().from(missions).where(eq(missions.id, request.params.missionId))
+
+  if (!row) {
+    response.status(404).json({ error: "Mission not found." })
+    return
+  }
+
+  const timestamp = now()
+  await db
+    .update(missions)
+    .set({
+      status: "dismissed",
+      updatedAt: timestamp,
+    })
+    .where(eq(missions.id, row.id))
+
+  response.json({ ok: true })
+})
+
+app.delete("/api/missions/:missionId", async (request, response) => {
+  const [row]: MissionRow[] = await db.select().from(missions).where(eq(missions.id, request.params.missionId))
+
+  if (!row) {
+    response.status(404).json({ error: "Mission not found." })
+    return
+  }
+
+  await deleteMissionCascade(db, row.id)
+  response.json({ ok: true })
+})
+
 // ── Sessions (unified recent executions) ──
 
 app.get("/api/sessions/recent", async (_request, response) => {
@@ -1882,6 +2164,22 @@ app.get("/api/sessions/recent", async (_request, response) => {
     .limit(20)
     .all()
 
+  const missionExecRows = db
+    .select({
+      id: missionExecutions.id,
+      sourceId: missionExecutions.missionId,
+      name: missions.title,
+      status: missionExecutions.status,
+      startedAt: missionExecutions.startedAt,
+      finishedAt: missionExecutions.finishedAt,
+      resultMessage: missionExecutions.resultMessage,
+    })
+    .from(missionExecutions)
+    .leftJoin(missions, eq(missionExecutions.missionId, missions.id))
+    .orderBy(desc(missionExecutions.startedAt))
+    .limit(20)
+    .all()
+
   const combined = [
     ...triggerRows.map((r) => ({
       id: `trigger-${r.id}`,
@@ -1898,6 +2196,16 @@ app.get("/api/sessions/recent", async (_request, response) => {
       type: "schedule" as const,
       sourceId: r.sourceId,
       name: r.name ?? "Unknown schedule",
+      status: r.status,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt ?? null,
+      resultMessage: r.resultMessage?.slice(0, 200) ?? null,
+    })),
+    ...missionExecRows.map((r) => ({
+      id: `mission-${r.id}`,
+      type: "mission" as const,
+      sourceId: r.sourceId,
+      name: r.name ?? "Unknown mission",
       status: r.status,
       startedAt: r.startedAt,
       finishedAt: r.finishedAt ?? null,
@@ -2034,6 +2342,10 @@ let schedulerTimer: ReturnType<typeof setInterval> | null = null
 app.listen(config.port, () => {
   console.log(`Argus relay listening on http://127.0.0.1:${config.port}`)
 
+  void seedDemoMissions(db).catch((err) => {
+    console.error("Failed to seed demo missions:", err)
+  })
+
   schedulerTimer = startScheduler(db)
 
   if (shouldAutoTunnel()) {
@@ -2054,9 +2366,19 @@ app.listen(config.port, () => {
   }
 })
 
-process.on("SIGINT", () => {
+function shutdown() {
   if (schedulerTimer) clearInterval(schedulerTimer)
   stopTunnel()
-  sqlite.close()
+  try {
+    sqlite.close()
+  } catch {
+    // already closed
+  }
   process.exit(0)
-})
+}
+
+// Handle both SIGINT (Ctrl+C) and SIGTERM (`tsx watch` reloads, docker stop,
+// systemd, etc.) so the cloudflared child doesn't leak into a zombie on every
+// code reload.
+process.on("SIGINT", shutdown)
+process.on("SIGTERM", shutdown)
