@@ -5,6 +5,7 @@ import { MissionCard } from "@/components/decision-card"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { getAgent, getMissions } from "@/lib/relay-api"
 import type { AgentConfig, MissionSummary } from "@/lib/relay-api"
+import { useRelayEvent } from "@/lib/relay-events"
 
 function App() {
   const [missions, setMissions] = useState<MissionSummary[] | null>(null)
@@ -24,9 +25,11 @@ function App() {
 
   useEffect(() => {
     reload()
-    const interval = setInterval(reload, 15_000)
-    return () => clearInterval(interval)
   }, [reload])
+
+  // SSE drives all subsequent refreshes — no polling needed. The relay emits
+  // a `missions` event on create/update/delete/scan/execution state change.
+  useRelayEvent("missions", reload)
 
   useEffect(() => {
     let cancelled = false

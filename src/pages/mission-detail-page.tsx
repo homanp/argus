@@ -21,6 +21,7 @@ import { ProviderGlyph } from "@/components/provider-glyph"
 import { JsonView } from "@/components/ui/json-view"
 import { decideMission, dismissMission, getAgent, getMission } from "@/lib/relay-api"
 import type { AgentConfig, MissionAction, MissionDetailResponse, MissionSignal } from "@/lib/relay-api"
+import { useRelayEvent } from "@/lib/relay-events"
 import { cn } from "@/lib/utils"
 
 function syncNavbar(mission: MissionDetailResponse["mission"] | null) {
@@ -294,16 +295,10 @@ function MissionDetailPage() {
     return clearNavbar
   }, [reload])
 
-  // Live-poll while any execution is still in flight so the Decision history
-  // block updates pending → running → completed/failed without manual refresh.
-  const hasActiveExecution = Boolean(
-    data?.executions.some((exec) => exec.status === "pending" || exec.status === "running"),
-  )
-  useEffect(() => {
-    if (!hasActiveExecution) return
-    const interval = setInterval(() => reload(), 2000)
-    return () => clearInterval(interval)
-  }, [hasActiveExecution, reload])
+  // SSE drives refreshes. The relay emits `missions` on state changes,
+  // including mission_executions going pending → running → completed/failed,
+  // so the Decision history block updates live without polling.
+  useRelayEvent("missions", reload)
 
   useEffect(() => {
     let cancelled = false

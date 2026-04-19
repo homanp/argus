@@ -5,6 +5,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 
 import { extractAgentJson } from "./agent-json.js"
 import { getConfiguredAgent, runAgent } from "./agent.js"
+import { emitEvent } from "./events.js"
 import * as schema from "./db/schema.js"
 import {
   githubWebhookEvents,
@@ -162,6 +163,7 @@ function writeOperatingDoc(
     .where(eq(operatingDoc.id, OPERATING_DOC_ID))
     .run()
 
+  emitEvent("missions")
   return db.select().from(operatingDoc).where(eq(operatingDoc.id, OPERATING_DOC_ID)).get() as OperatingDocRow
 }
 
@@ -384,6 +386,10 @@ function persistSummary(db: DB, summary: ScanSummary) {
     .set({ lastScanSummaryJson: JSON.stringify(summary), updatedAt: nowIso() })
     .where(eq(missionSettings.id, SETTINGS_ID))
     .run()
+  // Every scan end is an observable state change — surfaced missions land
+  // in the list, suppressions land in Insights, settings change timestamps.
+  // One broadcast covers all of those for subscribed tabs.
+  emitEvent("missions")
 }
 
 // ── Tick (called from scheduler) ─────────────────────────────────────────

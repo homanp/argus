@@ -23,6 +23,7 @@ import type {
   OperatingDoc,
   OperatingDocUpdate,
 } from "@/lib/relay-api"
+import { useRelayEvent } from "@/lib/relay-events"
 import { cn } from "@/lib/utils"
 
 function timeAgo(iso: string | null | undefined) {
@@ -322,21 +323,18 @@ function InsightsPage() {
 
   useEffect(() => {
     reload()
-    const interval = setInterval(reload, 15_000)
-    return () => clearInterval(interval)
   }, [reload])
+
+  useRelayEvent("missions", reload)
 
   async function handleScan() {
     setScanning(true)
     try {
       await scanMissionsNow()
-      // Poll a few times to catch the scan completing — summary is written async.
-      for (let i = 0; i < 6; i += 1) {
-        await new Promise((r) => setTimeout(r, 2500))
-        await reload()
-        const s = await getMissionSettings()
-        if (s.lastScanSummary && s.lastScanSummary.finishedAt) break
-      }
+      // The relay emits a `missions` SSE event when the scan completes,
+      // which triggers our subscribed `reload`. We just wait briefly so
+      // the button shows spinning until at least one refresh happens.
+      await new Promise((resolve) => setTimeout(resolve, 800))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed.")
     } finally {

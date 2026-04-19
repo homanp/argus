@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { getMissionSettings, scanMissionsNow, updateMissionSettings } from "@/lib/relay-api"
 import type { MissionSettings } from "@/lib/relay-api"
+import { useRelayEvent } from "@/lib/relay-events"
 import { cn } from "@/lib/utils"
 
 const INTERVAL_OPTIONS = [
@@ -67,6 +68,8 @@ function MissionEngineCard() {
   useEffect(() => {
     reload()
   }, [reload])
+
+  useRelayEvent("missions", reload)
 
   async function patch(update: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes">>) {
     if (!settings) return

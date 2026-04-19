@@ -32,6 +32,7 @@ import {
   triggerExecutions,
   triggers,
 } from "./db/schema.js"
+import { emitEvent, subscribeToEvents } from "./events.js"
 import {
   ensureMissionSettings,
   ensureOperatingDoc,
@@ -1224,6 +1225,14 @@ app.get("/health", (_request, response) => {
   })
 })
 
+// Server-sent events — a single long-lived stream the UI subscribes to.
+// The payload is intentionally empty; each event's name (`missions`,
+// `triggers`, `schedules`, `channels`, `agent`) tells the client which
+// local data to invalidate and refetch.
+app.get("/api/events", (_request, response) => {
+  subscribeToEvents(response)
+})
+
 app.get("/api/channels", async (_request, response) => {
   response.json(await getChannelsState())
 })
@@ -1256,7 +1265,9 @@ app.post("/api/channels/:provider", express.json(), async (request, response) =>
   }
 
   try {
-    response.json(await upsertChannel(request.params.provider, request.body ?? {}))
+    const state = await upsertChannel(request.params.provider, request.body ?? {})
+    emitEvent("channels")
+    response.json(state)
   } catch (error) {
     response.status(400).json({
       error: error instanceof Error ? error.message : "Failed to save channel configuration.",
@@ -1271,6 +1282,7 @@ app.delete("/api/channels/:provider", async (request, response) => {
   }
 
   await removeChannel(request.params.provider)
+  emitEvent("channels")
   response.json({ ok: true })
 })
 
@@ -1566,6 +1578,7 @@ app.post("/api/triggers", express.json(), async (request, response) => {
   })
 
   const [created]: TriggerRow[] = await db.select().from(triggers).where(eq(triggers.id, id))
+  emitEvent("triggers")
   response.json({
     id: created.id,
     name: created.name,
@@ -1629,6 +1642,7 @@ app.patch("/api/triggers/:triggerId", express.json(), async (request, response) 
     .orderBy(desc(triggerExecutions.matchedAt))
     .limit(1)
 
+  emitEvent("triggers")
   response.json({
     id: updated.id,
     name: updated.name,
@@ -1664,6 +1678,7 @@ app.delete("/api/triggers/:triggerId", async (request, response) => {
   await db.delete(triggerExecutions).where(eq(triggerExecutions.triggerId, existing.id))
   await db.delete(triggers).where(eq(triggers.id, existing.id))
 
+  emitEvent("triggers")
   response.json({ ok: true })
 })
 
@@ -1821,6 +1836,7 @@ app.post("/api/schedules", express.json(), async (request, response) => {
   })
 
   const [created]: ScheduleRow[] = await db.select().from(schedules).where(eq(schedules.id, id))
+  emitEvent("schedules")
   response.json({
     id: created.id,
     name: created.name,
@@ -1880,6 +1896,7 @@ app.patch("/api/schedules/:scheduleId", express.json(), async (request, response
     .from(scheduleExecutions)
     .where(eq(scheduleExecutions.scheduleId, existing.id))
 
+  emitEvent("schedules")
   response.json({
     id: updated.id,
     name: updated.name,
@@ -1906,6 +1923,7 @@ app.delete("/api/schedules/:scheduleId", async (request, response) => {
 
   await db.delete(scheduleExecutions).where(eq(scheduleExecutions.scheduleId, existing.id))
   await db.delete(schedules).where(eq(schedules.id, existing.id))
+  emitEvent("schedules")
 
   response.json({ ok: true })
 })
@@ -2179,6 +2197,7 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
           .where(eq(agentTable.id, "default"))
           .run()
 
+        emitEvent("missions")
         console.log(`[agent] mission action "${chosen.key}" → exit ${result.exitCode}`)
       })
       .catch((err) => {
@@ -2188,6 +2207,7 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
           .set({ status: "failed", finishedAt: finished, resultMessage: message.slice(0, 4000) })
           .where(eq(missionExecutions.id, execution.id))
           .run()
+        emitEvent("missions")
         console.error(`[agent] mission action "${chosen.key}" failed:`, message)
       })
   } else {
@@ -2199,6 +2219,7 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
       .run()
   }
 
+  emitEvent("missions")
   response.json({ ok: true, actionKey, executionId: execution.id })
 })
 
@@ -2228,6 +2249,7 @@ app.post("/api/missions/:missionId/dismiss", async (request, response) => {
     missionRecommendation: row.recommendation,
   }).catch((err) => console.error("[opdoc] update after dismiss failed:", err))
 
+  emitEvent("missions")
   response.json({ ok: true })
 })
 
@@ -2249,6 +2271,7 @@ app.delete("/api/missions/:missionId", async (request, response) => {
   }).catch((err) => console.error("[opdoc] update after delete failed:", err))
 
   await deleteMissionCascade(db, row.id)
+  emitEvent("missions")
   response.json({ ok: true })
 })
 
@@ -2270,6 +2293,7 @@ app.put("/api/mission-settings", express.json(), async (request, response) => {
     patch.lookbackMinutes = Math.round(body.lookbackMinutes)
   }
   const row = updateMissionSettings(db, patch)
+  emitEvent("missions")
   response.json(serializeMissionSettings(row))
 })
 
@@ -2487,11 +2511,13 @@ app.post("/api/agent", express.json(), async (request, response) => {
     .run()
 
   const configured = getConfiguredAgent(db)
+  emitEvent("agent")
   response.json(configured)
 })
 
 app.delete("/api/agent", async (_request, response) => {
   db.delete(agentTable).where(eq(agentTable.id, "default")).run()
+  emitEvent("agent")
   response.json({ ok: true })
 })
 

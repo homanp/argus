@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
 import { Alert02Icon, GithubIcon, MoreHorizontalIcon, Settings01Icon } from "@hugeicons/core-free-icons"
 
@@ -19,6 +19,7 @@ import {
 import { primaryNavigation, workspaceNavigation } from "@/lib/app-shell-data"
 import { getAgent, getChannels, getMissions, getRecentSessions, getSchedules, getTriggers } from "@/lib/relay-api"
 import type { RecentSession } from "@/lib/relay-api"
+import { useRelayEvent } from "@/lib/relay-events"
 import { timeAgo } from "@/lib/schedule-utils"
 import { cn } from "@/lib/utils"
 
@@ -37,54 +38,59 @@ function AppSidebar() {
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([])
   const [sessionsExpanded, setSessionsExpanded] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    getTriggers()
-      .then((data) => {
-        if (!cancelled) setTriggerCount(data.length)
-      })
-      .catch(() => {})
-    getSchedules()
-      .then((data) => {
-        if (!cancelled) setScheduleCount(data.length)
-      })
-      .catch(() => {})
-    getChannels()
-      .then((data) => {
-        if (!cancelled) setChannelCount(data.filter((item) => item.status === "connected").length)
-      })
-      .catch(() => {})
+  const refreshMissions = useCallback(() => {
     getMissions()
-      .then((data) => {
-        if (!cancelled) setMissionCount(data.filter((item) => item.status === "awaiting_decision").length)
-      })
+      .then((data) => setMissionCount(data.filter((item) => item.status === "awaiting_decision").length))
       .catch(() => {})
-    getAgent()
-      .then((data) => {
-        if (!cancelled) setAgentConfigured(data !== null)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [pathname])
-
-  useEffect(() => {
-    let cancelled = false
-    const fetchSessions = () => {
-      getRecentSessions()
-        .then((data) => {
-          if (!cancelled) setRecentSessions(data)
-        })
-        .catch(() => {})
-    }
-    fetchSessions()
-    const interval = setInterval(fetchSessions, 15_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
   }, [])
+  const refreshTriggers = useCallback(() => {
+    getTriggers()
+      .then((data) => setTriggerCount(data.length))
+      .catch(() => {})
+  }, [])
+  const refreshSchedules = useCallback(() => {
+    getSchedules()
+      .then((data) => setScheduleCount(data.length))
+      .catch(() => {})
+  }, [])
+  const refreshChannels = useCallback(() => {
+    getChannels()
+      .then((data) => setChannelCount(data.filter((item) => item.status === "connected").length))
+      .catch(() => {})
+  }, [])
+  const refreshAgent = useCallback(() => {
+    getAgent()
+      .then((data) => setAgentConfigured(data !== null))
+      .catch(() => {})
+  }, [])
+  const refreshSessions = useCallback(() => {
+    getRecentSessions()
+      .then(setRecentSessions)
+      .catch(() => {})
+  }, [])
+
+  // Initial load — one fetch per domain. SSE takes over after this; no
+  // polling interval. `pathname` is still a dependency so hard navigation
+  // between top-level views refreshes stale counts immediately.
+  useEffect(() => {
+    refreshMissions()
+    refreshTriggers()
+    refreshSchedules()
+    refreshChannels()
+    refreshAgent()
+    refreshSessions()
+  }, [pathname, refreshAgent, refreshChannels, refreshMissions, refreshSchedules, refreshSessions, refreshTriggers])
+
+  useRelayEvent("missions", refreshMissions)
+  useRelayEvent("triggers", refreshTriggers)
+  useRelayEvent("schedules", refreshSchedules)
+  useRelayEvent("channels", refreshChannels)
+  useRelayEvent("agent", refreshAgent)
+  // Recent sessions reflect mission + trigger + schedule activity, so any
+  // of those events should refresh the list.
+  useRelayEvent("missions", refreshSessions)
+  useRelayEvent("triggers", refreshSessions)
+  useRelayEvent("schedules", refreshSessions)
 
   const resolvedPrimaryNav = useMemo(
     () =>
