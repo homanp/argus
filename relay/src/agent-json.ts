@@ -36,4 +36,4 @@ function extractAgentJson<T = unknown>(raw: string): T | null {
   return null
 }
 
-export { cleanAgentText, extractAgentJson }
+export { extractAgentJson }
