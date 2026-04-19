@@ -98,10 +98,32 @@ const PROVIDER_ICON_MAP: Record<string, AppIcon> = {
   gmail: Mail01Icon,
 }
 
+// Brand logos that live in /public. When a provider has one, prefer it over
+// the HugeIcon glyph so badges render with the real product mark.
+const PROVIDER_BRAND_IMAGE_MAP: Record<string, string> = {
+  github: "/github.svg",
+  slack: "/slack.svg",
+  telegram: "/telegram.svg",
+  whatsapp: "/whatsapp.svg",
+  email: "/resend.svg",
+}
+
 function iconForProvider(provider: string): AppIcon {
   const key = provider.toLowerCase()
   return PROVIDER_ICON_MAP[key] ?? ConnectIcon
 }
 
-export { PROVIDER_ICON_MAP, iconForProvider, missionsHeader, primaryNavigation, workspaceNavigation }
+function brandImageForProvider(provider: string): string | null {
+  return PROVIDER_BRAND_IMAGE_MAP[provider.toLowerCase()] ?? null
+}
+
+export {
+  PROVIDER_BRAND_IMAGE_MAP,
+  PROVIDER_ICON_MAP,
+  brandImageForProvider,
+  iconForProvider,
+  missionsHeader,
+  primaryNavigation,
+  workspaceNavigation,
+}
 export type { AppIcon, NavigationItem }

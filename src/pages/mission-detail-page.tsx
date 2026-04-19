@@ -17,8 +17,8 @@ import remarkGfm from "remark-gfm"
 import { Badge, badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { HugeIcon } from "@/components/ui/huge-icon"
+import { ProviderGlyph } from "@/components/provider-glyph"
 import { JsonView } from "@/components/ui/json-view"
-import { iconForProvider } from "@/lib/app-shell-data"
 import { decideMission, dismissMission, getAgent, getMission } from "@/lib/relay-api"
 import type { AgentConfig, MissionDetailResponse, MissionSignal } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
@@ -129,14 +129,13 @@ function PlanStepRow({
 function SignalCard({ signal }: { signal: MissionSignal }) {
   const [expanded, setExpanded] = useState(true)
   const provider = signal.source ?? "argus"
-  const icon = iconForProvider(provider)
   const comment = `${signal.source ? `${signal.source}/` : ""}${signal.eventType ?? "event"}`
 
   return (
     <div className="overflow-hidden rounded-lg border border-white/8 bg-white/[0.02]">
       <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">
         <Badge variant="subtle" size="md" className="text-white/80">
-          <HugeIcon icon={icon} size={14} className="text-white/60" />
+          <ProviderGlyph provider={provider} size={14} iconClassName="text-white/60" />
           <span className="font-medium text-white capitalize">{provider}</span>
           <span className="text-white/35">{signal.eventType ?? "webhook"}</span>
         </Badge>
@@ -333,7 +332,6 @@ function MissionDetailPage() {
   }
 
   const { mission, signals, executions } = data
-  const sourceIcon = iconForProvider(mission.sourceProvider)
   const isDecided = mission.status !== "awaiting_decision"
 
   return (
@@ -343,7 +341,7 @@ function MissionDetailPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
               <Badge variant="subtle" size="md" className="text-white/80">
-                <HugeIcon icon={sourceIcon} size={14} className="text-white/60" />
+                <ProviderGlyph provider={mission.sourceProvider} size={14} iconClassName="text-white/60" />
                 <span className="font-medium text-white capitalize">{mission.sourceProvider}</span>
                 <span className="text-white/35">{mission.sourceEventType}</span>
               </Badge>

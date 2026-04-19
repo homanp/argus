@@ -2,11 +2,11 @@ import { useState } from "react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { Link } from "@tanstack/react-router"
 
+import { ProviderGlyph } from "@/components/provider-glyph"
 import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { iconForProvider } from "@/lib/app-shell-data"
 import { decideMission } from "@/lib/relay-api"
 import type { MissionSummary } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
@@ -53,7 +53,6 @@ function MissionCard({
   const [decidedKey, setDecidedKey] = useState<string | null>(mission.decidedActionKey ?? null)
   const isDecided = mission.status !== "awaiting_decision" || decidedKey !== null
 
-  const sourceIcon = iconForProvider(mission.sourceProvider)
   const actions = mission.actions.length > 0 ? mission.actions : []
 
   async function handleAction(actionKey: string) {
@@ -81,7 +80,7 @@ function MissionCard({
       <CardContent className="space-y-5 px-5 py-5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
           <Badge variant="subtle" size="md" className="text-white/80">
-            <HugeIcon icon={sourceIcon} size={14} className="text-white/60" />
+            <ProviderGlyph provider={mission.sourceProvider} size={14} iconClassName="text-white/60" />
             <span className="font-medium text-white capitalize">{mission.sourceProvider}</span>
             <span className="text-white/35">{mission.sourceEventType}</span>
           </Badge>
