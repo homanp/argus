@@ -42,7 +42,7 @@ import {
   updateOperatingDocFromDecision,
   writeOperatingDoc,
 } from "./mission-engine.js"
-import { deleteMissionCascade } from "./missions.js"
+import { buildMissionActionContext, deleteMissionCascade, loadMissionSignals } from "./missions.js"
 import { seedDemoMissions } from "./missions-seed.js"
 import { startScheduler, computeNextRunAt, isValidCron } from "./scheduler.js"
 import { startTunnel, stopTunnel } from "./tunnel.js"
@@ -2090,6 +2090,11 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
     return
   }
 
+  if (row.status !== "awaiting_decision") {
+    response.status(409).json({ error: `Mission is already ${row.status}.` })
+    return
+  }
+
   const actionKey = typeof request.body?.actionKey === "string" ? request.body.actionKey.trim() : ""
   if (!actionKey) {
     response.status(400).json({ error: "actionKey is required." })
@@ -2105,6 +2110,22 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
 
   const timestamp = now()
 
+  // Build the enriched dispatch prompt: mission analysis + plan + chosen
+  // action + artifact + source signals. Persist the full prompt to
+  // `promptSent` so it's auditable from the mission detail page.
+  const plan = parseMissionPlan(row) as Parameters<typeof buildMissionActionContext>[0]["mission"]["plan"]
+  const signals = await loadMissionSignals(db, row.id)
+  const enrichedPrompt = buildMissionActionContext({
+    mission: {
+      title: row.title,
+      analysisMarkdown: row.analysisMarkdown,
+      recommendation: row.recommendation,
+      plan,
+    },
+    action: chosen,
+    signals,
+  })
+
   await db
     .update(missions)
     .set({
@@ -2115,15 +2136,16 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
     })
     .where(eq(missions.id, row.id))
 
-  await db.insert(missionExecutions).values({
-    missionId: row.id,
-    actionKey,
-    promptSent: chosen.actionPrompt,
-    // TODO: dispatch promptSent to runAgent here and flip status to "running"
-    // once mission action execution is wired to the configured coding agent.
-    status: "pending",
-    startedAt: timestamp,
-  })
+  const [execution] = await db
+    .insert(missionExecutions)
+    .values({
+      missionId: row.id,
+      actionKey,
+      promptSent: enrichedPrompt,
+      status: "pending",
+      startedAt: timestamp,
+    })
+    .returning()
 
   recordDecision(db, row.id, "approved", actionKey)
   void updateOperatingDocFromDecision(db, {
@@ -2134,7 +2156,50 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
     missionRecommendation: row.recommendation,
   }).catch((err) => console.error("[opdoc] update after decide failed:", err))
 
-  response.json({ ok: true, actionKey })
+  // Fire-and-forget agent dispatch. Mirrors the trigger dispatch pattern
+  // above — caller gets a prompt response immediately and polls the
+  // mission detail endpoint to observe pending → running → completed/failed.
+  const configured = getConfiguredAgent(db)
+  if (configured && configured.status === "active") {
+    db.update(missionExecutions).set({ status: "running" }).where(eq(missionExecutions.id, execution.id)).run()
+
+    runAgent(configured.command, enrichedPrompt)
+      .then((result) => {
+        const finished = new Date().toISOString()
+        const status = result.exitCode === 0 ? "completed" : "failed"
+        const message = result.stdout || result.stderr || `exit ${result.exitCode}`
+
+        db.update(missionExecutions)
+          .set({ status, finishedAt: finished, resultMessage: message.slice(0, 4000) })
+          .where(eq(missionExecutions.id, execution.id))
+          .run()
+
+        db.update(agentTable)
+          .set({ lastUsedAt: finished, updatedAt: finished })
+          .where(eq(agentTable.id, "default"))
+          .run()
+
+        console.log(`[agent] mission action "${chosen.key}" → exit ${result.exitCode}`)
+      })
+      .catch((err) => {
+        const finished = new Date().toISOString()
+        const message = err instanceof Error ? err.message : String(err)
+        db.update(missionExecutions)
+          .set({ status: "failed", finishedAt: finished, resultMessage: message.slice(0, 4000) })
+          .where(eq(missionExecutions.id, execution.id))
+          .run()
+        console.error(`[agent] mission action "${chosen.key}" failed:`, message)
+      })
+  } else {
+    db.update(missionExecutions)
+      .set({
+        resultMessage: "No agent configured; action prompt captured but not dispatched.",
+      })
+      .where(eq(missionExecutions.id, execution.id))
+      .run()
+  }
+
+  response.json({ ok: true, actionKey, executionId: execution.id })
 })
 
 app.post("/api/missions/:missionId/dismiss", async (request, response) => {

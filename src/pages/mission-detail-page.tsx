@@ -294,6 +294,17 @@ function MissionDetailPage() {
     return clearNavbar
   }, [reload])
 
+  // Live-poll while any execution is still in flight so the Decision history
+  // block updates pending → running → completed/failed without manual refresh.
+  const hasActiveExecution = Boolean(
+    data?.executions.some((exec) => exec.status === "pending" || exec.status === "running"),
+  )
+  useEffect(() => {
+    if (!hasActiveExecution) return
+    const interval = setInterval(() => reload(), 2000)
+    return () => clearInterval(interval)
+  }, [hasActiveExecution, reload])
+
   useEffect(() => {
     let cancelled = false
     getAgent()

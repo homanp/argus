@@ -371,6 +371,131 @@ function buildDocUpdatePrompt(input: DocUpdatePromptInput): string {
   ].join("\n")
 }
 
+// ── Mission action dispatch prompt + signals ─────────────────────────────
+
+type MissionSnapshot = {
+  title: string
+  analysisMarkdown: string
+  recommendation: string
+  plan: MissionPlanStep[]
+}
+
+type MissionSignalSnapshot = {
+  source: string | null
+  eventType: string | null
+  payload: unknown
+}
+
+/**
+ * Loads the webhook-event payloads linked to a mission through
+ * `mission_signals`. Returns them in the order they were attached (trigger
+ * first, then context rows). Used by `buildMissionActionContext` to ground
+ * the dispatched agent call in the same facts the mission itself cited.
+ */
+async function loadMissionSignals(db: DB, missionId: string): Promise<MissionSignalSnapshot[]> {
+  const rows = await db
+    .select({
+      id: missionSignals.id,
+      source: githubWebhookEvents.source,
+      eventType: githubWebhookEvents.eventType,
+      payloadJson: githubWebhookEvents.payloadJson,
+    })
+    .from(missionSignals)
+    .leftJoin(githubWebhookEvents, eq(missionSignals.webhookEventId, githubWebhookEvents.id))
+    .where(eq(missionSignals.missionId, missionId))
+    .orderBy(missionSignals.id)
+
+  return rows.map((row) => {
+    let payload: unknown = null
+    if (row.payloadJson) {
+      try {
+        payload = JSON.parse(row.payloadJson)
+      } catch {
+        payload = row.payloadJson
+      }
+    }
+    return { source: row.source ?? null, eventType: row.eventType ?? null, payload }
+  })
+}
+
+type MissionActionContextInput = {
+  mission: MissionSnapshot
+  action: MissionAction
+  signals: MissionSignalSnapshot[]
+}
+
+function formatPlanForDispatch(plan: MissionPlanStep[]): string {
+  if (plan.length === 0) return "(no plan steps proposed)"
+  return plan
+    .map((step) => {
+      const bits = [`${step.step}. ${step.description}`]
+      if (step.tool) bits.push(`tool: \`${step.tool}\``)
+      if (step.estimate) bits.push(`estimate: ${step.estimate}`)
+      bits.push(`reversibility: ${step.reversibilityLabel || step.reversibility}`)
+      return bits.join(" — ")
+    })
+    .join("\n")
+}
+
+function formatArtifactForDispatch(action: MissionAction): string {
+  const artifact = action.artifact
+  if (!artifact) return "(no pre-drafted artifact — generate one if the instruction requires output)"
+  const lines = [`Kind: ${artifact.kind}`]
+  if (artifact.title) lines.push(`Title: ${artifact.title}`)
+  if (artifact.recipient) lines.push(`Recipient: ${artifact.recipient}`)
+  lines.push("Body:", artifact.body)
+  return lines.join("\n")
+}
+
+function formatSignalsForDispatch(signals: MissionSignalSnapshot[]): string {
+  if (signals.length === 0) return "(none)"
+  return signals
+    .map((signal, index) => {
+      const label = `${signal.source ?? "unknown"}/${signal.eventType ?? "event"}`
+      // Keep the prompt bounded even if a payload is unusually large.
+      const payloadJson = JSON.stringify(signal.payload ?? null, null, 2)
+      const clipped = payloadJson.length > 3000 ? `${payloadJson.slice(0, 3000)}\n…` : payloadJson
+      return `### signal ${index + 1} — ${label}\n${clipped}`
+    })
+    .join("\n\n")
+}
+
+function buildMissionActionContext(input: MissionActionContextInput): string {
+  const { mission, action, signals } = input
+  return [
+    `[Argus mission execution]`,
+    `You are executing a decision the user just approved. Follow the chosen action exactly.`,
+    `If a pre-drafted artifact is present, treat the artifact body as the exact thing to send — do not rewrite unless the instruction explicitly asks for edits.`,
+    ``,
+    `# Mission: ${mission.title}`,
+    ``,
+    `# Analysis`,
+    mission.analysisMarkdown || "(none)",
+    ``,
+    `# Recommended action (what Argus suggested)`,
+    mission.recommendation || "(none)",
+    ``,
+    `# Plan (context — execute the chosen action, not every step)`,
+    formatPlanForDispatch(mission.plan),
+    ``,
+    `# Chosen action`,
+    `Label: ${action.label}`,
+    `Key: ${action.key}`,
+    `Instruction: ${action.actionPrompt || "(no explicit instruction — follow the artifact)"}`,
+    ``,
+    `# Pre-drafted artifact`,
+    formatArtifactForDispatch(action),
+    ``,
+    `# Source signals (raw webhook payloads this mission was derived from)`,
+    formatSignalsForDispatch(signals),
+    ``,
+    `# Output rules`,
+    `- If you complete the action, return a short plain-text confirmation (one paragraph) describing what you did and any identifiers created.`,
+    `- If you need the user to confirm anything further, explain what's needed and stop.`,
+    `- Do NOT return JSON. This is executed output, not structured data for a parser.`,
+  ].join("\n")
+}
+
 // ── Mission insertion ────────────────────────────────────────────────────
 
 async function insertMissionFromCandidate(db: DB, candidate: MissionCandidate, agentName: string): Promise<string> {
@@ -434,8 +559,10 @@ export {
   buildCriticPrompt,
   buildDocUpdatePrompt,
   buildGeneratorPrompt,
+  buildMissionActionContext,
   deleteMissionCascade,
   insertMissionFromCandidate,
+  loadMissionSignals,
   parseCandidates,
   parseVerdicts,
 }
@@ -445,10 +572,13 @@ export type {
   CriticPromptInput,
   DocUpdatePromptInput,
   MissionAction,
+  MissionActionContextInput,
   MissionArtifact,
   MissionArtifactKind,
   MissionCandidate,
   MissionPlanStep,
+  MissionSignalSnapshot,
+  MissionSnapshot,
   RecentDecision,
   Verdict,
 }

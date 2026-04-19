@@ -261,7 +261,7 @@ function RootLayout() {
                 ) : (
                   <>
                     <p className="font-medium text-white">{header.title}</p>
-                    <p className="truncate text-[11px] text-white/30">{header.subtitle}</p>
+                    <p className="truncate text-white/30">{header.subtitle}</p>
                   </>
                 )}
               </nav>
