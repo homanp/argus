@@ -33,6 +33,12 @@ type SeedMission = {
     label: string
     hotkey: string
     actionPrompt: string
+    artifact?: {
+      kind: "markdown" | "email" | "github_comment" | "slack_message"
+      title?: string
+      body: string
+      recipient?: string
+    }
   }>
   signalPayload: Record<string, unknown>
 }
@@ -116,6 +122,24 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "1",
         actionPrompt:
           "Create a $1,200 Stripe coupon valid 12 months for Brin Team plan. Draft an empathetic email to jane@acme.com acknowledging their restructure, then surface the draft for one-click send. Update the Linear deal to at-risk · credit-offered and schedule a 5-day follow-up.",
+        artifact: {
+          kind: "email",
+          title: "Finalizing your account adjustment",
+          recipient: "jane@acme.com",
+          body: [
+            "Hi Jane,",
+            "",
+            "I saw the LinkedIn note about the restructure — totally get it. Rather than close the account, here's an option that keeps things flexible while you rebuild:",
+            "",
+            "- **$1,200 credit** (50% of your $2,400 payment) applied to the Brin Team plan, valid for 12 months.",
+            "- No seat reduction needed — use what you want, come back to 14 seats whenever you're ready.",
+            "- If you'd rather just close out instead, reply and we'll process the full refund.",
+            "",
+            "Either way, no ticket needed. Just let me know.",
+            "",
+            "— Homan",
+          ].join("\n"),
+        },
       },
       {
         key: "approve_full",
@@ -123,6 +147,20 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "2",
         actionPrompt:
           "Issue the full $2,400 refund via Stripe. Draft a gracious offboarding email to jane@acme.com and surface it for one-click send. Close the Linear deal as churned · full-refund.",
+        artifact: {
+          kind: "email",
+          title: "Refund processed — thank you for trying Brin",
+          recipient: "jane@acme.com",
+          body: [
+            "Hi Jane,",
+            "",
+            "Just processed the full **$2,400 refund** — it should hit your account in 5-10 business days.",
+            "",
+            "We appreciate you giving Brin a shot. If the team shape changes and you want to come back down the line, your data stays archived for 90 days.",
+            "",
+            "— Homan",
+          ].join("\n"),
+        },
       },
       {
         key: "draft_starter",
@@ -130,6 +168,24 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "3",
         actionPrompt:
           "Draft a Starter plan migration proposal for Acme — keep 6 seats, move from $600/mo to $240/mo, offer a $1,200 credit as migration incentive. Surface the draft for one-click send.",
+        artifact: {
+          kind: "email",
+          title: "A Starter plan option for the new team size",
+          recipient: "jane@acme.com",
+          body: [
+            "Hi Jane,",
+            "",
+            "Quick thought instead of a refund — we could migrate you to **Starter** which is sized for smaller teams:",
+            "",
+            "- 6 seats, down from 14",
+            "- **$240/mo** instead of $600/mo",
+            "- I'd apply the **$1,200 credit** toward the first 5 months so migration is free",
+            "",
+            "If that shape works, I'll run the migration this afternoon. Otherwise the refund is ready to go.",
+            "",
+            "— Homan",
+          ].join("\n"),
+        },
       },
       {
         key: "decline",
@@ -137,6 +193,20 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "4",
         actionPrompt:
           "Decline the refund request. Draft a clear, empathetic email to jane@acme.com citing the terms and offering a support call. Surface the draft for one-click send.",
+        artifact: {
+          kind: "email",
+          title: "Re: refund request",
+          recipient: "jane@acme.com",
+          body: [
+            "Hi Jane,",
+            "",
+            "Thanks for reaching out. Our terms are 30-day refunds from initial purchase, so I can't refund the Apr payment — but I'd love to find a shape that works.",
+            "",
+            "Would a 15-minute call make sense? I can walk through usage-based plans that might fit the new team size better.",
+            "",
+            "— Homan",
+          ].join("\n"),
+        },
       },
     ],
     signalPayload: {
@@ -211,6 +281,20 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "1",
         actionPrompt:
           "Cancel the Friday 11am prep block and send Sarah Chen a confirmed invite for Friday 11am. Draft a short reply acknowledging the move and surface for one-click send.",
+        artifact: {
+          kind: "email",
+          title: "Friday 11am works",
+          recipient: "sarah.chen@sequoiacap.com",
+          body: [
+            "Sarah —",
+            "",
+            "Friday 11am works. Invite coming in the next few minutes.",
+            "",
+            "Before LA — anything specific you want to prep on? I can pull numbers beforehand if useful.",
+            "",
+            "— Homan",
+          ].join("\n"),
+        },
       },
       {
         key: "send_mon_10",
@@ -292,6 +376,21 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "1",
         actionPrompt:
           "Split PR #891 into a deprecation notice PR and a fix PR. Open the deprecation PR first with JSDoc @deprecated and a runtime warning. Post a summary to Slack #engineering.",
+        artifact: {
+          kind: "github_comment",
+          title: "PR comment: Proposing a two-step ship",
+          recipient: "brinlabs/brin-core#891",
+          body: [
+            "Nice find on the cache invalidation — the fix itself is solid. Before merging though, heads-up that this changes the signature of `Brin.score()` which is called by ~340 external integrations/day.",
+            "",
+            "Proposing we **ship this in two parts**, matching the pattern we've used 6 times before without fallout:",
+            "",
+            "1. **PR A (today):** Add `@deprecated` JSDoc + a runtime `console.warn` on the old signature. No behavior change. Tag `v2.18.0`.",
+            "2. **PR B (2 weeks out):** This PR's actual fix. Tag `v3.0.0`.",
+            "",
+            "I'll open PR A from this branch and retarget this one to land afterward — sound good?",
+          ].join("\n"),
+        },
       },
       {
         key: "merge_asis",
@@ -367,6 +466,23 @@ const SEED_MISSIONS: SeedMission[] = [
         hotkey: "1",
         actionPrompt:
           "Book the Jun 15 07:10 GOT → SFO flight for $612, block Jun 14 morning on the family calendar for the regional finals, and confirm the YC dinner organizer that I'll still make it.",
+        artifact: {
+          kind: "markdown",
+          title: "Booking summary — Jun 15 GOT → SFO",
+          body: [
+            "**Flight**: SAS SK943  ",
+            "**Depart**: Jun 15, 07:10 GOT → 09:45 SFO (via ARN)  ",
+            "**Price**: $612 (economy, one carry-on, seat 14A)",
+            "",
+            "**Calendar changes:**",
+            '- Block Jun 14 morning as "Kids track finals — do not disturb"',
+            "- Move packing window to Jun 14 evening",
+            "",
+            "**Ping YC dinner organizer:** confirm arrival Jun 15 evening, no timing change needed.",
+            "",
+            "Approve to book and apply all changes.",
+          ].join("\n"),
+        },
       },
       {
         key: "book_14",

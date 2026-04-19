@@ -20,7 +20,7 @@ import { HugeIcon } from "@/components/ui/huge-icon"
 import { ProviderGlyph } from "@/components/provider-glyph"
 import { JsonView } from "@/components/ui/json-view"
 import { decideMission, dismissMission, getAgent, getMission } from "@/lib/relay-api"
-import type { AgentConfig, MissionDetailResponse, MissionSignal } from "@/lib/relay-api"
+import type { AgentConfig, MissionAction, MissionDetailResponse, MissionSignal } from "@/lib/relay-api"
 import { cn } from "@/lib/utils"
 
 function syncNavbar(mission: MissionDetailResponse["mission"] | null) {
@@ -156,6 +156,52 @@ function SignalCard({ signal }: { signal: MissionSignal }) {
         </div>
       </div>
       {expanded && <JsonView value={signal.payload ?? {}} comment={comment} />}
+    </div>
+  )
+}
+
+const ARTIFACT_KIND_LABEL: Record<string, string> = {
+  markdown: "Markdown",
+  email: "Email draft",
+  github_comment: "GitHub comment",
+  slack_message: "Slack message",
+}
+
+const ARTIFACT_RECIPIENT_LABEL: Record<string, string> = {
+  email: "To",
+  github_comment: "On",
+  slack_message: "In",
+  markdown: "For",
+}
+
+function ArtifactCard({ action }: { action: MissionAction }) {
+  const artifact = action.artifact
+  if (!artifact) return null
+  const kindLabel = ARTIFACT_KIND_LABEL[artifact.kind] ?? artifact.kind
+  const recipientLabel = ARTIFACT_RECIPIENT_LABEL[artifact.kind] ?? "For"
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/8 bg-white/[0.02]">
+      <div className="flex items-start justify-between gap-3 border-b border-white/6 px-5 py-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <Badge variant="subtle" size="sm" className="text-[10px] text-white/80">
+              {kindLabel}
+            </Badge>
+            <p className="truncate text-[13px] font-medium text-white">{action.label}</p>
+          </div>
+          {artifact.title && <p className="truncate text-[12px] text-white/55">{artifact.title}</p>}
+        </div>
+        {artifact.recipient && (
+          <div className="shrink-0 text-right text-[11px] text-white/45">
+            <p className="uppercase tracking-wide text-white/30">{recipientLabel}</p>
+            <p className="font-mono text-white/70">{artifact.recipient}</p>
+          </div>
+        )}
+      </div>
+      <div className="px-5 py-4 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-2 [&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.body}</ReactMarkdown>
+      </div>
     </div>
   )
 }
@@ -387,6 +433,22 @@ function MissionDetailPage() {
               )}
             </div>
           </div>
+
+          {mission.actions.some((action) => action.artifact) && (
+            <div className="space-y-3">
+              <div className="flex items-baseline gap-2">
+                <p className="text-[12px] font-medium text-white/40">Drafted outcomes</p>
+                <p className="text-[11px] text-white/35">What happens if you approve — review before clicking.</p>
+              </div>
+              <div className="space-y-3">
+                {mission.actions
+                  .filter((action) => action.artifact)
+                  .map((action) => (
+                    <ArtifactCard key={action.key} action={action} />
+                  ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-baseline gap-2">

@@ -21,15 +21,28 @@ import {
   githubWebhookEvents,
   integrations,
   missionExecutions,
+  missionSettings,
   missionSignals,
+  missionSuppressions,
   missions,
+  operatingDocUpdates,
   scheduleExecutions,
   schedules,
   triggerDeliveryAttempts,
   triggerExecutions,
   triggers,
 } from "./db/schema.js"
-import { deleteMissionCascade, generateMission } from "./missions.js"
+import {
+  ensureMissionSettings,
+  ensureOperatingDoc,
+  recordDecision,
+  revertOperatingDocUpdate,
+  runMissionScan,
+  updateMissionSettings,
+  updateOperatingDocFromDecision,
+  writeOperatingDoc,
+} from "./mission-engine.js"
+import { deleteMissionCascade } from "./missions.js"
 import { seedDemoMissions } from "./missions-seed.js"
 import { startScheduler, computeNextRunAt, isValidCron } from "./scheduler.js"
 import { startTunnel, stopTunnel } from "./tunnel.js"
@@ -952,15 +965,9 @@ async function recordWebhookEvent({
 
   if (inserted) {
     await evaluateTriggers(inserted.id, "github", eventType, payload)
-
-    void generateMission(db, {
-      webhookEventId: inserted.id,
-      provider: "github",
-      eventType,
-      payload,
-    }).catch((err) => {
-      console.error(`[missions] generation failed for event ${inserted.id}:`, err)
-    })
+    // Missions are no longer generated per-event. The scheduler-driven
+    // mission engine (`relay/src/mission-engine.ts`) looks at windows of
+    // events on a cadence and decides what to surface.
   }
 }
 
@@ -1986,6 +1993,30 @@ function serializeMissionSummary(row: MissionRow) {
   }
 }
 
+type MissionSettingsRow = typeof missionSettings.$inferSelect
+
+function serializeMissionSettings(row: MissionSettingsRow) {
+  let lastScanSummary: unknown = null
+  if (row.lastScanSummaryJson) {
+    try {
+      lastScanSummary = JSON.parse(row.lastScanSummaryJson)
+    } catch {
+      lastScanSummary = null
+    }
+  }
+  return {
+    id: row.id,
+    enabled: Boolean(row.enabled),
+    intervalMinutes: row.intervalMinutes,
+    lookbackMinutes: row.lookbackMinutes,
+    lastScanAt: row.lastScanAt ?? null,
+    nextScanAt: row.nextScanAt ?? null,
+    lastScanSummary,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
 app.get("/api/missions", async (_request, response) => {
   const rows: MissionRow[] = await db.select().from(missions).orderBy(desc(missions.createdAt))
   response.json(rows.map(serializeMissionSummary))
@@ -2094,6 +2125,15 @@ app.post("/api/missions/:missionId/decide", express.json(), async (request, resp
     startedAt: timestamp,
   })
 
+  recordDecision(db, row.id, "approved", actionKey)
+  void updateOperatingDocFromDecision(db, {
+    missionId: row.id,
+    kind: "approved",
+    actionKey,
+    missionTitle: row.title,
+    missionRecommendation: row.recommendation,
+  }).catch((err) => console.error("[opdoc] update after decide failed:", err))
+
   response.json({ ok: true, actionKey })
 })
 
@@ -2114,6 +2154,15 @@ app.post("/api/missions/:missionId/dismiss", async (request, response) => {
     })
     .where(eq(missions.id, row.id))
 
+  recordDecision(db, row.id, "dismissed", null)
+  void updateOperatingDocFromDecision(db, {
+    missionId: row.id,
+    kind: "dismissed",
+    actionKey: null,
+    missionTitle: row.title,
+    missionRecommendation: row.recommendation,
+  }).catch((err) => console.error("[opdoc] update after dismiss failed:", err))
+
   response.json({ ok: true })
 })
 
@@ -2125,8 +2174,137 @@ app.delete("/api/missions/:missionId", async (request, response) => {
     return
   }
 
+  recordDecision(db, row.id, "deleted", null)
+  void updateOperatingDocFromDecision(db, {
+    missionId: row.id,
+    kind: "deleted",
+    actionKey: null,
+    missionTitle: row.title,
+    missionRecommendation: row.recommendation,
+  }).catch((err) => console.error("[opdoc] update after delete failed:", err))
+
   await deleteMissionCascade(db, row.id)
   response.json({ ok: true })
+})
+
+// ── Mission engine: settings, scans, suppressions, operating doc ──
+
+app.get("/api/mission-settings", async (_request, response) => {
+  const row = ensureMissionSettings(db)
+  response.json(serializeMissionSettings(row))
+})
+
+app.put("/api/mission-settings", express.json(), async (request, response) => {
+  const body = request.body ?? {}
+  const patch: Parameters<typeof updateMissionSettings>[1] = {}
+  if (typeof body.enabled === "boolean") patch.enabled = body.enabled
+  if (typeof body.intervalMinutes === "number" && Number.isFinite(body.intervalMinutes)) {
+    patch.intervalMinutes = Math.round(body.intervalMinutes)
+  }
+  if (typeof body.lookbackMinutes === "number" && Number.isFinite(body.lookbackMinutes)) {
+    patch.lookbackMinutes = Math.round(body.lookbackMinutes)
+  }
+  const row = updateMissionSettings(db, patch)
+  response.json(serializeMissionSettings(row))
+})
+
+app.post("/api/missions/scan", async (_request, response) => {
+  // Fire-and-forget so a slow agent doesn't block the HTTP response. The
+  // caller polls `/api/mission-settings` → `lastScanSummary` to see results.
+  void runMissionScan(db, { trigger: "manual" }).catch((err) => {
+    console.error("[mission-engine] manual scan failed:", err)
+  })
+  response.json({ ok: true, startedAt: new Date().toISOString() })
+})
+
+app.get("/api/mission-suppressions", async (request, response) => {
+  const scanId = typeof request.query.scanId === "string" ? request.query.scanId : null
+  const limit = Math.min(100, Math.max(1, Number(request.query.limit ?? 25)))
+  const base = db.select().from(missionSuppressions)
+  const rows = (scanId ? base.where(eq(missionSuppressions.scanId, scanId)) : base)
+    .orderBy(desc(missionSuppressions.id))
+    .limit(limit)
+    .all()
+
+  response.json(
+    rows.map((row) => {
+      let candidate: unknown = null
+      try {
+        candidate = JSON.parse(row.candidateJson)
+      } catch {
+        candidate = null
+      }
+      return {
+        id: row.id,
+        scanId: row.scanId,
+        verdict: row.verdict,
+        reason: row.reason ?? null,
+        createdAt: row.createdAt,
+        candidate,
+      }
+    }),
+  )
+})
+
+app.get("/api/operating-doc", async (_request, response) => {
+  const row = ensureOperatingDoc(db)
+  response.json({
+    markdown: row.markdown,
+    updatedBy: row.updatedBy,
+    updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+  })
+})
+
+app.put("/api/operating-doc", express.json(), async (request, response) => {
+  const markdown = typeof request.body?.markdown === "string" ? request.body.markdown : null
+  if (markdown === null) {
+    response.status(400).json({ error: "markdown is required." })
+    return
+  }
+  const row = writeOperatingDoc(db, markdown, "manual", { reason: "Manual edit" })
+  response.json({
+    markdown: row.markdown,
+    updatedBy: row.updatedBy,
+    updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+  })
+})
+
+app.get("/api/operating-doc/updates", async (request, response) => {
+  const limit = Math.min(100, Math.max(1, Number(request.query.limit ?? 50)))
+  const rows = db.select().from(operatingDocUpdates).orderBy(desc(operatingDocUpdates.id)).limit(limit).all()
+  response.json(
+    rows.map((row) => ({
+      id: row.id,
+      before: row.before,
+      after: row.after,
+      diff: row.diff ?? null,
+      reason: row.reason ?? null,
+      source: row.source,
+      missionId: row.missionId ?? null,
+      createdAt: row.createdAt,
+    })),
+  )
+})
+
+app.post("/api/operating-doc/updates/:updateId/revert", async (request, response) => {
+  const updateId = Number(request.params.updateId)
+  if (!Number.isInteger(updateId)) {
+    response.status(400).json({ error: "updateId must be an integer." })
+    return
+  }
+  try {
+    const row = revertOperatingDocUpdate(db, updateId)
+    response.json({
+      markdown: row.markdown,
+      updatedBy: row.updatedBy,
+      updatedAt: row.updatedAt,
+      createdAt: row.createdAt,
+    })
+  } catch (err) {
+    response.status(404).json({ error: err instanceof Error ? err.message : "Revert failed." })
+  }
 })
 
 // ── Sessions (unified recent executions) ──

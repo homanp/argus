@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { AiBrain02Icon, CancelCircleIcon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons"
 
+import { MissionEngineCard } from "@/components/mission-engine-card"
 import { Badge } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
@@ -390,6 +391,8 @@ function AgentsPage() {
             </div>
           </div>
         )}
+
+        {configured && <MissionEngineCard />}
       </div>
     </section>
   )

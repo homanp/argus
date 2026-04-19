@@ -210,14 +210,24 @@ type MissionPlanStep = {
   reversibilityLabel?: string
 }
 
+type MissionArtifactKind = "markdown" | "email" | "github_comment" | "slack_message"
+
+type MissionArtifact = {
+  kind: MissionArtifactKind
+  title?: string
+  body: string
+  recipient?: string
+}
+
 type MissionAction = {
   key: string
   label: string
   hotkey: string
   actionPrompt: string
+  artifact?: MissionArtifact
 }
 
-type Mission = MissionSummary & {
+type Mission = Omit<MissionSummary, "actions"> & {
   plan: MissionPlanStep[]
   actions: MissionAction[]
 }
@@ -539,6 +549,109 @@ async function deleteMission(missionId: string) {
   })
 }
 
+// ── Mission engine ──
+
+type MissionScanSummary = {
+  scanId: string
+  startedAt: string
+  finishedAt: string | null
+  windowMinutes: number
+  eventCount: number
+  groupCount: number
+  candidateCount: number
+  surfacedCount: number
+  suppressedCount: number
+  missionIds: string[]
+  error?: string
+}
+
+type MissionSettings = {
+  id: string
+  enabled: boolean
+  intervalMinutes: number
+  lookbackMinutes: number
+  lastScanAt: string | null
+  nextScanAt: string | null
+  lastScanSummary: MissionScanSummary | null
+  createdAt: string
+  updatedAt: string
+}
+
+type MissionSuppression = {
+  id: number
+  scanId: string
+  verdict: string
+  reason: string | null
+  createdAt: string
+  candidate: unknown
+}
+
+type OperatingDoc = {
+  markdown: string
+  updatedBy: "user" | "agent" | "system" | string
+  updatedAt: string
+  createdAt: string
+}
+
+type OperatingDocUpdate = {
+  id: number
+  before: string
+  after: string
+  diff: string | null
+  reason: string | null
+  source: "decision" | "manual" | string
+  missionId: string | null
+  createdAt: string
+}
+
+async function getMissionSettings() {
+  return request<MissionSettings>("/api/mission-settings")
+}
+
+async function updateMissionSettings(
+  patch: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes">>,
+) {
+  return request<MissionSettings>("/api/mission-settings", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  })
+}
+
+async function scanMissionsNow() {
+  return request<{ ok: true; startedAt: string }>("/api/missions/scan", {
+    method: "POST",
+  })
+}
+
+async function getMissionSuppressions(params: { scanId?: string; limit?: number } = {}) {
+  const query = new URLSearchParams()
+  if (params.scanId) query.set("scanId", params.scanId)
+  if (params.limit) query.set("limit", String(params.limit))
+  const suffix = query.toString() ? `?${query.toString()}` : ""
+  return request<MissionSuppression[]>(`/api/mission-suppressions${suffix}`)
+}
+
+async function getOperatingDoc() {
+  return request<OperatingDoc>("/api/operating-doc")
+}
+
+async function updateOperatingDoc(markdown: string) {
+  return request<OperatingDoc>("/api/operating-doc", {
+    method: "PUT",
+    body: JSON.stringify({ markdown }),
+  })
+}
+
+async function getOperatingDocUpdates(limit = 50) {
+  return request<OperatingDocUpdate[]>(`/api/operating-doc/updates?limit=${limit}`)
+}
+
+async function revertOperatingDocUpdate(updateId: number) {
+  return request<OperatingDoc>(`/api/operating-doc/updates/${updateId}/revert`, {
+    method: "POST",
+  })
+}
+
 async function validateAgent() {
   return request<ValidateResult>("/api/agent/validate", {
     method: "POST",
@@ -567,7 +680,11 @@ export {
   getGitHubAvailableEvents,
   getGitHubIntegration,
   getMission,
+  getMissionSettings,
+  getMissionSuppressions,
   getMissions,
+  getOperatingDoc,
+  getOperatingDocUpdates,
   getRecentSessions,
   getScheduleExecutions,
   getSchedules,
@@ -577,10 +694,14 @@ export {
   previewSchedule,
   removeChannel,
   removeAgent,
+  revertOperatingDocUpdate,
+  scanMissionsNow,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
   testAgent,
+  updateMissionSettings,
+  updateOperatingDoc,
   updateSchedule,
   updateTrigger,
   validateAgent,
@@ -594,11 +715,18 @@ export type {
   DetectedAgent,
   Mission,
   MissionAction,
+  MissionArtifact,
+  MissionArtifactKind,
   MissionDetailResponse,
   MissionExecution,
   MissionPlanStep,
+  MissionScanSummary,
+  MissionSettings,
   MissionSignal,
   MissionSummary,
+  MissionSuppression,
+  OperatingDoc,
+  OperatingDocUpdate,
   TelegramDiscoveryResponse,
   ValidateResult,
   GitHubIntegrationRepository,

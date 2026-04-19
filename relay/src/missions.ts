@@ -3,8 +3,6 @@ import crypto from "node:crypto"
 import { eq, inArray } from "drizzle-orm"
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 
-import { extractAgentJson } from "./agent-json.js"
-import { getConfiguredAgent, runAgent } from "./agent.js"
 import * as schema from "./db/schema.js"
 import { githubWebhookEvents, missions, missionSignals } from "./db/schema.js"
 
@@ -24,14 +22,26 @@ type MissionPlanStep = {
   reversibilityLabel?: string
 }
 
+type MissionArtifactKind = "markdown" | "email" | "github_comment" | "slack_message"
+
+type MissionArtifact = {
+  kind: MissionArtifactKind
+  title?: string
+  body: string
+  recipient?: string
+}
+
 type MissionAction = {
   key: string
   label: string
   hotkey: string
   actionPrompt: string
+  artifact?: MissionArtifact
 }
 
-type MissionBody = {
+type MissionCandidate = {
+  /** Generator-assigned id, used to match critic verdicts back to candidates. */
+  id: string
   title: string
   urgent: boolean
   priority: "low" | "normal" | "high"
@@ -39,97 +49,35 @@ type MissionBody = {
   analysisMarkdown: string
   confidence: number
   confidenceLabel: string
+  sourceProvider: string
+  sourceEventType: string
   plan: MissionPlanStep[]
   actions: MissionAction[]
-  additionalSignalEventIds?: number[]
+  citedEventIds: number[]
 }
 
-type MissionOutput = { mission: null; reason: string } | { mission: MissionBody }
+type Verdict = {
+  id: string
+  verdict: "surface" | "suppress"
+  reason: string
+}
 
-type GenerateMissionInput = {
-  webhookEventId: number
+type EventGroup = {
   provider: string
   eventType: string
-  payload: Record<string, unknown>
+  count: number
+  sampleTitles: string[]
+  ids: number[]
 }
 
-function buildMissionPrompt(input: GenerateMissionInput) {
-  const schemaExample = {
-    mission: {
-      title: "Short, human-readable question or decision the user needs to make",
-      urgent: false,
-      priority: "normal",
-      recommendation: "One-line recommended action, written as a direct verb phrase",
-      analysisMarkdown:
-        "A 2-4 paragraph prose analysis in Markdown. Cite concrete facts from the payload. **Bold** key numbers. Use `code` for identifiers.",
-      confidence: 0.82,
-      confidenceLabel: "short confidence tag (e.g. 'brin verified', 'values call', 'api impact')",
-      plan: [
-        {
-          step: 1,
-          description:
-            "What the first step does, concretely. Wrap identifiers, emails, amounts, and enums in `backticks` so they render as inline code pills.",
-          tool: "stripe.coupons.create",
-          estimate: "~2s",
-          reversibility: "reversible",
-          reversibilityLabel: "reversible",
-        },
-      ],
-      actions: [
-        {
-          key: "offer_credit",
-          label: "Offer 50% credit",
-          hotkey: "1",
-          actionPrompt:
-            "Plain-language instruction that will be handed to the coding agent if the user picks this action. Be specific.",
-        },
-      ],
-      additionalSignalEventIds: [],
-    },
-  }
-
-  const skipExample = {
-    mission: null,
-    reason: "Why this event does not warrant a mission (one short sentence).",
-  }
-
-  return [
-    `[Argus mission generation]`,
-    `You are Argus. A webhook event just arrived. Decide whether it warrants a "mission" — a decision the user should review.`,
-    ``,
-    `Source: ${input.provider}`,
-    `Event: ${input.eventType}`,
-    `Webhook event id: ${input.webhookEventId}`,
-    ``,
-    `[Event payload]`,
-    JSON.stringify(input.payload, null, 2).slice(0, 6000),
-    ``,
-    `[Rules]`,
-    `- Return valid JSON only. Do not wrap in markdown fences.`,
-    `- If the event is routine (pings, trivial pushes, bot comments, noise), return: ${JSON.stringify(skipExample)}`,
-    `- Otherwise return a mission object. Keep analysisMarkdown tight (≤ 4 paragraphs) and grounded in the payload — do not invent data.`,
-    `- "plan" should have 3-6 concrete steps. "actions" should have 2-4 choices with hotkeys "1", "2", "3", "4".`,
-    `- "confidence" is between 0 and 1. "priority" is one of "low" | "normal" | "high".`,
-    `- "reversibility" per plan step is one of "reversible" | "auto" | "attention" (controls the dot color). "reversibilityLabel" is an optional short freeform label rendered next to the dot (e.g. "saved to drafts first", "30s recall window after send", "automatic"). When omitted, a default label is derived from reversibility.`,
-    `- Plan step descriptions are rendered as Markdown — wrap identifiers, emails, amounts, statuses, and enums in \`backticks\` so they render as inline code pills.`,
-    ``,
-    `[Response schema example]`,
-    JSON.stringify(schemaExample, null, 2),
-  ].join("\n")
+type RecentDecision = {
+  kind: string
+  actionKey: string | null
+  missionTitle: string | null
+  createdAt: string
 }
 
-function isMissionBody(value: unknown): value is MissionBody {
-  if (!value || typeof value !== "object") return false
-  const body = value as Partial<MissionBody>
-  return (
-    typeof body.title === "string" &&
-    typeof body.recommendation === "string" &&
-    typeof body.analysisMarkdown === "string" &&
-    typeof body.confidence === "number" &&
-    Array.isArray(body.plan) &&
-    Array.isArray(body.actions)
-  )
-}
+// ── Validators / normalizers ──────────────────────────────────────────────
 
 function normalizePlan(plan: unknown): MissionPlanStep[] {
   if (!Array.isArray(plan)) return []
@@ -156,123 +104,323 @@ function normalizePlan(plan: unknown): MissionPlanStep[] {
   return result
 }
 
+const ARTIFACT_KINDS = new Set<MissionArtifactKind>(["markdown", "email", "github_comment", "slack_message"])
+
+function normalizeArtifact(value: unknown): MissionArtifact | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const obj = value as Partial<MissionArtifact>
+  const kind =
+    typeof obj.kind === "string" && ARTIFACT_KINDS.has(obj.kind as MissionArtifactKind)
+      ? (obj.kind as MissionArtifactKind)
+      : "markdown"
+  const body = typeof obj.body === "string" ? obj.body.trim() : ""
+  if (!body) return undefined
+  const artifact: MissionArtifact = { kind, body }
+  if (typeof obj.title === "string" && obj.title.trim()) artifact.title = obj.title.trim()
+  if (typeof obj.recipient === "string" && obj.recipient.trim()) artifact.recipient = obj.recipient.trim()
+  return artifact
+}
+
 function normalizeActions(actions: unknown): MissionAction[] {
   if (!Array.isArray(actions)) return []
-  return actions
-    .map((raw, index) => {
-      if (!raw || typeof raw !== "object") return null
-      const action = raw as Partial<MissionAction>
-      return {
-        key: String(action.key ?? `action_${index + 1}`).trim(),
-        label: String(action.label ?? "").trim(),
-        hotkey: String(action.hotkey ?? String(index + 1)).trim(),
-        actionPrompt: String(action.actionPrompt ?? "").trim(),
-      } satisfies MissionAction
+  const result: MissionAction[] = []
+  for (const [index, raw] of actions.entries()) {
+    if (!raw || typeof raw !== "object") continue
+    const action = raw as Partial<MissionAction>
+    const label = String(action.label ?? "").trim()
+    if (!label) continue
+    const normalized: MissionAction = {
+      key: String(action.key ?? `action_${index + 1}`).trim(),
+      label,
+      hotkey: String(action.hotkey ?? String(index + 1)).trim(),
+      actionPrompt: String(action.actionPrompt ?? "").trim(),
+    }
+    const artifact = normalizeArtifact(action.artifact)
+    if (artifact) normalized.artifact = artifact
+    result.push(normalized)
+  }
+  return result
+}
+
+function isMissionCandidate(value: unknown): value is MissionCandidate {
+  if (!value || typeof value !== "object") return false
+  const c = value as Partial<MissionCandidate>
+  return (
+    typeof c.title === "string" &&
+    typeof c.recommendation === "string" &&
+    typeof c.analysisMarkdown === "string" &&
+    typeof c.confidence === "number" &&
+    Array.isArray(c.plan) &&
+    Array.isArray(c.actions)
+  )
+}
+
+function normalizeCandidate(raw: unknown, index: number): MissionCandidate | null {
+  if (!isMissionCandidate(raw)) return null
+  const c = raw as MissionCandidate
+  const priority = c.priority === "low" || c.priority === "high" ? c.priority : "normal"
+  const citedEventIds = Array.isArray(c.citedEventIds)
+    ? c.citedEventIds.filter((x): x is number => Number.isInteger(x))
+    : []
+  return {
+    id: typeof c.id === "string" && c.id.trim() ? c.id.trim() : `cand_${index + 1}`,
+    title: c.title.trim(),
+    urgent: Boolean(c.urgent),
+    priority,
+    recommendation: c.recommendation.trim(),
+    analysisMarkdown: c.analysisMarkdown.trim(),
+    confidence: Math.max(0, Math.min(1, c.confidence)),
+    confidenceLabel: typeof c.confidenceLabel === "string" ? c.confidenceLabel.trim() : "",
+    sourceProvider: typeof c.sourceProvider === "string" && c.sourceProvider.trim() ? c.sourceProvider.trim() : "argus",
+    sourceEventType:
+      typeof c.sourceEventType === "string" && c.sourceEventType.trim() ? c.sourceEventType.trim() : "pattern",
+    plan: normalizePlan(c.plan),
+    actions: normalizeActions(c.actions),
+    citedEventIds,
+  }
+}
+
+function parseCandidates(raw: unknown): MissionCandidate[] {
+  if (!Array.isArray(raw)) return []
+  const result: MissionCandidate[] = []
+  for (const [i, item] of raw.entries()) {
+    const c = normalizeCandidate(item, i)
+    if (c) result.push(c)
+  }
+  return result
+}
+
+function parseVerdicts(raw: unknown): Verdict[] {
+  if (!Array.isArray(raw)) return []
+  const out: Verdict[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const v = item as Partial<Verdict>
+    if (typeof v.id !== "string" || !v.id) continue
+    const verdict = v.verdict === "surface" ? "surface" : "suppress"
+    out.push({ id: v.id, verdict, reason: typeof v.reason === "string" ? v.reason.trim() : "" })
+  }
+  return out
+}
+
+// ── Prompt builders ───────────────────────────────────────────────────────
+
+type GeneratorPromptInput = {
+  operatingDoc: string
+  recentDecisions: RecentDecision[]
+  groups: EventGroup[]
+  windowMinutes: number
+}
+
+function formatEventGroup(group: EventGroup) {
+  const samples = group.sampleTitles
+    .slice(0, 5)
+    .map((t) => `  • ${t}`)
+    .join("\n")
+  const ids = group.ids.slice(0, 20).join(", ")
+  return [
+    `- ${group.provider}.${group.eventType} (${group.count} event${group.count === 1 ? "" : "s"})`,
+    samples,
+    `  eventIds: [${ids}${group.ids.length > 20 ? `, …+${group.ids.length - 20} more` : ""}]`,
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+function formatRecentDecisions(decisions: RecentDecision[]) {
+  if (decisions.length === 0) return "(none yet)"
+  return decisions
+    .map((d) => {
+      const who = d.actionKey ? `${d.kind} → ${d.actionKey}` : d.kind
+      const title = d.missionTitle ? ` "${d.missionTitle.slice(0, 80)}"` : ""
+      return `- [${d.createdAt}] ${who}${title}`
     })
-    .filter((action): action is MissionAction => Boolean(action && action.label))
+    .join("\n")
 }
 
-async function generateMission(db: DB, input: GenerateMissionInput): Promise<string | null> {
-  const configured = getConfiguredAgent(db)
-  if (!configured || configured.status !== "active") return null
-
-  const prompt = buildMissionPrompt(input)
-
-  let result
-  try {
-    result = await runAgent(configured.command, prompt)
-  } catch (err) {
-    console.error(`[missions] agent spawn failed:`, err)
-    return null
+function buildGeneratorPrompt(input: GeneratorPromptInput): string {
+  const candidateExample: MissionCandidate = {
+    id: "cand_1",
+    title: "Short headline of the decision",
+    urgent: false,
+    priority: "normal",
+    recommendation: "One-line recommended action, written as a direct verb phrase",
+    analysisMarkdown:
+      "2-4 paragraphs grounded in the cited events. **Bold** key numbers. Use `code` for identifiers. Never invent facts.",
+    confidence: 0.78,
+    confidenceLabel: "pattern in window",
+    sourceProvider: "github",
+    sourceEventType: "issues",
+    plan: [
+      {
+        step: 1,
+        description: "What the first step does, concretely",
+        tool: "github.issues.comment",
+        estimate: "~2s",
+        reversibility: "reversible",
+      },
+    ],
+    actions: [
+      {
+        key: "approve",
+        label: "Send reply to all 3",
+        hotkey: "1",
+        actionPrompt: "Specific instruction the coding agent would execute if the user picks this action.",
+        artifact: {
+          kind: "github_comment",
+          title: "Reply to issue #123",
+          recipient: "homanp/argus#123",
+          body: "Pre-drafted markdown body of what would be posted. This is what the user will see and approve.",
+        },
+      },
+    ],
+    citedEventIds: [42, 43, 44],
   }
 
-  if (result.exitCode !== 0) {
-    console.warn(`[missions] agent exited with code ${result.exitCode} — skipping mission`)
-    return null
-  }
-
-  const parsed = extractAgentJson<MissionOutput>(result.stdout || result.stderr || "")
-  if (!parsed) {
-    console.warn(`[missions] agent response did not contain JSON — skipping mission`)
-    return null
-  }
-
-  if (parsed.mission === null) {
-    console.log(`[missions] agent declined mission: ${parsed.reason ?? "no reason"}`)
-    return null
-  }
-
-  if (!isMissionBody(parsed.mission)) {
-    console.warn(`[missions] agent returned malformed mission object — skipping`)
-    return null
-  }
-
-  return insertMission(db, input, parsed.mission, configured.name)
+  return [
+    `[Argus mission scan — PHASE 1: GENERATE CANDIDATES]`,
+    `You run on a cadence. Given a window of recent events, propose 0-5 missions worth surfacing to the user.`,
+    ``,
+    `# Operating doc (your running theory of how this user operates)`,
+    input.operatingDoc.trim() || "(empty — no theory yet)",
+    ``,
+    `# Recent decisions (how the user has handled similar missions)`,
+    formatRecentDecisions(input.recentDecisions),
+    ``,
+    `# Event window — last ${input.windowMinutes} minutes, grouped by provider/type`,
+    input.groups.length === 0 ? "(no events in window)" : input.groups.map(formatEventGroup).join("\n\n"),
+    ``,
+    `# Rules`,
+    `- Return JSON array of 0-5 candidates. Fewer is better. Empty array is valid when nothing meets the bar.`,
+    `- A mission must: (a) save the user time, or (b) prevent a mistake, or (c) surface a pattern they couldn't easily see themselves. Not "might be interesting".`,
+    `- Ground every claim in cited event ids. Never invent facts.`,
+    `- Every action MUST include a pre-drafted \`artifact\` — the actual thing that would be produced on approval (comment body, email, message). The user should be able to say "yes, send exactly that".`,
+    `- Return ONLY JSON — no prose, no markdown fences.`,
+    ``,
+    `# Schema example (for ONE candidate — return an array)`,
+    JSON.stringify(candidateExample, null, 2),
+  ].join("\n")
 }
 
-async function insertMission(
-  db: DB,
-  input: GenerateMissionInput,
-  body: MissionBody,
-  agentName: string,
-): Promise<string> {
+type CriticPromptInput = {
+  operatingDoc: string
+  recentDecisions: RecentDecision[]
+  candidates: MissionCandidate[]
+}
+
+function buildCriticPrompt(input: CriticPromptInput): string {
+  return [
+    `[Argus mission scan — PHASE 2: CRITIQUE]`,
+    `You are the last line of defense before a mission reaches the user's inbox.`,
+    `Default to SUPPRESS. Only return "surface" when you are >70% confident the user would thank you for interrupting them RIGHT NOW.`,
+    `A pattern that "might be interesting" is not enough — the mission must change what the user would do today.`,
+    ``,
+    `# Operating doc`,
+    input.operatingDoc.trim() || "(empty — no theory yet)",
+    ``,
+    `# Recent decisions (what the user has accepted/dismissed)`,
+    formatRecentDecisions(input.recentDecisions),
+    ``,
+    `# Candidates to judge`,
+    JSON.stringify(
+      input.candidates.map((c) => ({
+        id: c.id,
+        title: c.title,
+        recommendation: c.recommendation,
+        analysisMarkdown: c.analysisMarkdown,
+        confidence: c.confidence,
+        citedEventIds: c.citedEventIds,
+      })),
+      null,
+      2,
+    ),
+    ``,
+    `# Output format`,
+    `Return JSON array with one verdict per candidate id:`,
+    `[{ "id": "cand_1", "verdict": "surface" | "suppress", "reason": "short one-sentence justification grounded in the operating doc or recent decisions" }]`,
+    `Every verdict MUST include a reason. Reasons for "suppress" should cite which operating-doc line or recent decision made you drop it.`,
+  ].join("\n")
+}
+
+type DocUpdatePromptInput = {
+  operatingDoc: string
+  decisionKind: string
+  actionKey: string | null
+  missionTitle: string
+  missionRecommendation: string
+}
+
+function buildDocUpdatePrompt(input: DocUpdatePromptInput): string {
+  return [
+    `[Operating doc update]`,
+    `You maintain a short markdown doc that captures how the user operates. Every time the user makes a decision on a mission, you consider whether that decision reveals something new about their preferences, and if so, you propose a small addition.`,
+    ``,
+    `# Current doc`,
+    input.operatingDoc.trim() || "(empty)",
+    ``,
+    `# New decision`,
+    `Mission: "${input.missionTitle}"`,
+    `Recommendation argus made: "${input.missionRecommendation}"`,
+    `User action: ${input.decisionKind}${input.actionKey ? ` (${input.actionKey})` : ""}`,
+    ``,
+    `# Rules`,
+    `- If this decision reveals a NEW preference that isn't already captured in the doc, return a tiny diff (1-3 lines). Otherwise return { "diff": null, "reason": "already captured" }.`,
+    `- The diff is raw markdown to append. Prefer short bulleted observations like "- prefers credits over refunds for month 3-6 churns".`,
+    `- Return JSON only: { "diff": string | null, "reason": string }.`,
+    `- Be conservative — better to return null than to duplicate existing lines or invent patterns from a single decision.`,
+  ].join("\n")
+}
+
+// ── Mission insertion ────────────────────────────────────────────────────
+
+async function insertMissionFromCandidate(db: DB, candidate: MissionCandidate, agentName: string): Promise<string> {
   const id = crypto.randomUUID()
   const timestamp = new Date().toISOString()
-  const priority = body.priority === "low" || body.priority === "high" ? body.priority : "normal"
+
+  // Use the first cited event as the triggering event for backward compat
+  // with the existing schema column.
+  const triggerEventId = candidate.citedEventIds[0] ?? null
 
   await db.insert(missions).values({
     id,
     status: "awaiting_decision",
-    priority,
-    urgent: Boolean(body.urgent),
-    sourceProvider: input.provider,
-    sourceEventType: input.eventType,
-    triggerWebhookEventId: input.webhookEventId,
-    title: body.title.trim(),
-    analysisMarkdown: body.analysisMarkdown.trim(),
-    recommendation: body.recommendation.trim(),
-    confidence: Math.max(0, Math.min(1, body.confidence)),
-    confidenceLabel: body.confidenceLabel?.trim() || null,
+    priority: candidate.priority,
+    urgent: candidate.urgent,
+    sourceProvider: candidate.sourceProvider,
+    sourceEventType: candidate.sourceEventType,
+    triggerWebhookEventId: triggerEventId,
+    title: candidate.title,
+    analysisMarkdown: candidate.analysisMarkdown,
+    recommendation: candidate.recommendation,
+    confidence: candidate.confidence,
+    confidenceLabel: candidate.confidenceLabel || null,
     agentName,
-    // channelHint and metadataJson are legacy columns kept nullable / empty
-    // until a schema migration lands. The UI no longer reads either.
     channelHint: null,
-    planJson: JSON.stringify(normalizePlan(body.plan)),
-    actionsJson: JSON.stringify(normalizeActions(body.actions)),
+    planJson: JSON.stringify(candidate.plan),
+    actionsJson: JSON.stringify(candidate.actions),
     metadataJson: "[]",
     createdAt: timestamp,
     updatedAt: timestamp,
   })
 
-  await db.insert(missionSignals).values({
-    missionId: id,
-    webhookEventId: input.webhookEventId,
-    label: "trigger",
-    createdAt: timestamp,
-  })
-
-  const additional = Array.isArray(body.additionalSignalEventIds)
-    ? body.additionalSignalEventIds.filter((value): value is number => Number.isInteger(value))
-    : []
-
-  if (additional.length > 0) {
+  // Link every cited event that actually exists in the DB.
+  if (candidate.citedEventIds.length > 0) {
     const existing = await db
       .select({ id: githubWebhookEvents.id })
       .from(githubWebhookEvents)
-      .where(inArray(githubWebhookEvents.id, additional))
+      .where(inArray(githubWebhookEvents.id, candidate.citedEventIds))
 
     for (const row of existing) {
-      if (row.id === input.webhookEventId) continue
       await db.insert(missionSignals).values({
         missionId: id,
         webhookEventId: row.id,
-        label: "context",
+        label: row.id === triggerEventId ? "trigger" : "context",
         createdAt: timestamp,
       })
     }
   }
 
-  console.log(`[missions] created mission ${id} (${body.title.slice(0, 80)})`)
+  console.log(`[missions] surfaced mission ${id} (${candidate.title.slice(0, 80)})`)
   return id
 }
 
@@ -282,5 +430,25 @@ async function deleteMissionCascade(db: DB, missionId: string) {
   await db.delete(missions).where(eq(missions.id, missionId))
 }
 
-export { deleteMissionCascade, generateMission }
-export type { MissionAction, MissionBody, MissionOutput, MissionPlanStep }
+export {
+  buildCriticPrompt,
+  buildDocUpdatePrompt,
+  buildGeneratorPrompt,
+  deleteMissionCascade,
+  insertMissionFromCandidate,
+  parseCandidates,
+  parseVerdicts,
+}
+export type {
+  EventGroup,
+  GeneratorPromptInput,
+  CriticPromptInput,
+  DocUpdatePromptInput,
+  MissionAction,
+  MissionArtifact,
+  MissionArtifactKind,
+  MissionCandidate,
+  MissionPlanStep,
+  RecentDecision,
+  Verdict,
+}

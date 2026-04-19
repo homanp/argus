@@ -12,6 +12,7 @@ import {
   AiBrain02Icon,
   ArrowLeft02Icon,
   Calendar03Icon,
+  ChartUpIcon,
   ConnectIcon,
   Notification03Icon,
   Search01Icon,
@@ -33,6 +34,7 @@ import { channelCatalog } from "@/lib/channel-catalog"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import ChannelDetailPage from "@/pages/channel-detail-page"
 import ChannelsPage from "@/pages/channels-page"
+import InsightsPage from "@/pages/insights-page"
 import IntegrationDetailPage from "@/pages/integration-detail-page"
 import IntegrationsPage from "@/pages/integrations-page"
 import MissionDetailPage from "@/pages/mission-detail-page"
@@ -71,6 +73,11 @@ const routeHeaderMap = {
     title: "Agent",
     subtitle: "Configure the local CLI agent for triggers and schedules",
     icon: AiBrain02Icon,
+  },
+  "/insights": {
+    title: "Insights",
+    subtitle: "How Argus decides what reaches you",
+    icon: ChartUpIcon,
   },
 } as const
 
@@ -509,6 +516,12 @@ const missionDetailRoute = createRoute({
   component: MissionDetailPage,
 })
 
+const insightsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/insights",
+  component: InsightsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   connectorsRoute,
@@ -520,6 +533,7 @@ const routeTree = rootRoute.addChildren([
   schedulesRoute,
   scheduleDetailRoute,
   missionDetailRoute,
+  insightsRoute,
   agentsRoute,
 ])
 

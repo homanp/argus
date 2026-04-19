@@ -50,6 +50,7 @@ const primaryNavigation: NavigationItem[] = [
   {
     title: "Insights",
     icon: ChartUpIcon,
+    href: "/insights",
   },
 ]
 
