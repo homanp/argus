@@ -231,24 +231,60 @@ pick_bash_login_rc() {
   fi
 }
 
+current_shell_is() {
+  # $1 = shell name (e.g. zsh, bash, fish, dash, sh)
+  case "${SHELL:-}" in
+    */"$1"|"$1") return 0 ;;
+  esac
+  return 1
+}
+
 wire_shell_path() {
   MODIFIED_RCS=""
 
-  # zsh: ~/.zshenv is sourced by every zsh invocation (login + interactive
-  # + non-interactive). Creating it does not shadow any other zsh rc.
-  append_path_line_posix "$HOME/.zshenv"
+  # We only wire a shell's rc if that shell is in use — either it's the
+  # user's current $SHELL, or a matching rc file already exists. This
+  # avoids leaving spurious ~/.zshenv / ~/.config/fish/config.fish files
+  # on systems where the user doesn't actually use those shells.
+
+  # zsh: ~/.zshenv is sourced for every zsh invocation (login, interactive,
+  # non-interactive). Safe to create, but only if zsh is actually used.
+  if current_shell_is zsh \
+     || [ -f "$HOME/.zshenv" ] \
+     || [ -f "$HOME/.zshrc" ] \
+     || [ -f "$HOME/.zprofile" ]; then
+    append_path_line_posix "$HOME/.zshenv"
+  fi
 
   # bash interactive non-login (Linux default): standalone file, no
-  # fallback chain to worry about, safe to create.
-  append_path_line_posix "$HOME/.bashrc"
+  # fallback chain to worry about, safe to create when bash is in use.
+  if current_shell_is bash || [ -f "$HOME/.bashrc" ]; then
+    append_path_line_posix "$HOME/.bashrc"
+  fi
 
-  # bash / sh login shells (macOS Terminal default): append to whichever
-  # login rc is already in use, falling back to ~/.profile. Never create
+  # bash / sh / dash login shells: append to whichever login rc is
+  # already in use, falling back to ~/.profile. Never create
   # ~/.bash_profile when ~/.profile exists — see pick_bash_login_rc.
-  append_path_line_posix "$(pick_bash_login_rc)"
+  if current_shell_is bash || current_shell_is sh || current_shell_is dash \
+     || [ -f "$HOME/.bash_profile" ] \
+     || [ -f "$HOME/.bash_login" ] \
+     || [ -f "$HOME/.profile" ]; then
+    append_path_line_posix "$(pick_bash_login_rc)"
+  fi
 
-  # fish: config.fish is always read by fish; safe to create.
-  append_path_line_fish "$HOME/.config/fish/config.fish"
+  # fish: config.fish is always read by fish; safe to create when fish
+  # is in use.
+  if current_shell_is fish || [ -f "$HOME/.config/fish/config.fish" ]; then
+    append_path_line_fish "$HOME/.config/fish/config.fish"
+  fi
+
+  # Safety net: if we couldn't identify the user's shell from $SHELL and
+  # no matching rc existed, fall back to ~/.profile — the most portable
+  # POSIX login rc. This keeps the installer useful in minimal / exotic
+  # environments while avoiding the spurious-file behaviour above.
+  if [ -z "$MODIFIED_RCS" ] && ! grep -Fq "$ARGUS_PATH_MARKER" "$HOME/.profile" 2>/dev/null; then
+    append_path_line_posix "$HOME/.profile"
+  fi
 }
 
 # ── Dispatch ────────────────────────────────────────────────────────────────
