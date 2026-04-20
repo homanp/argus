@@ -209,13 +209,33 @@ the argus skill gives your coding agent direct context about your triggers, sche
 npx skills add argus-ai/argus
 ```
 
-**install the argus cli (coming soon):**
+**install the argus cli:**
 
-the argus CLI lets you manage connectors, triggers, schedules, and your agent configuration from the terminal without opening the desktop app:
+the argus CLI lets you manage triggers, schedules, missions, and your agent configuration from the terminal without opening the desktop app:
 
 ```bash
 curl -fsSL https://argus.dev/install | bash
 ```
+
+if you don't have the argus.dev vanity URL set up yet, install directly from the GitHub release asset:
+
+```bash
+curl -fsSL https://github.com/homanp/argus/releases/latest/download/install.sh | bash
+```
+
+pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and prints the `export PATH=…` line to add to your shell rc.
+
+v1 commands:
+
+```
+argus doctor
+argus agent [show|set|remove|detect|test|validate]
+argus triggers  [list|show|enable|disable|delete]
+argus schedules [list|show|enable|disable|delete]
+argus missions  [list|show|decide|dismiss|scan]
+```
+
+add `--json` to any command for machine-readable output, or `--relay-url` / `ARGUS_RELAY_URL` to point at a non-default relay.
 
 ### relay architecture
 

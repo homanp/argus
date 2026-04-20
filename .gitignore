@@ -15,6 +15,9 @@ dist-ssr
 # Relay runtime data
 relay/data/
 
+# CLI build output
+cli/target/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

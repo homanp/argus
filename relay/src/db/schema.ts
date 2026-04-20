@@ -217,6 +217,8 @@ const agent = sqliteTable("agent", {
   checkAgentOk: integer("check_agent_ok", { mode: "boolean" }),
   checkSkillOk: integer("check_skill_ok", { mode: "boolean" }),
   checkCliOk: integer("check_cli_ok", { mode: "boolean" }),
+  cliPath: text("cli_path"),
+  cliVersion: text("cli_version"),
   lastCheckedAt: text("last_checked_at"),
   ...timestamps,
 })

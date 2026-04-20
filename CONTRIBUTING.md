@@ -37,6 +37,7 @@ npm run format
 npm run lint
 npm run build
 cargo check --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path cli/Cargo.toml
 ```
 
 If you need to fix formatting automatically:
@@ -44,6 +45,42 @@ If you need to fix formatting automatically:
 ```bash
 npm run format:fix
 ```
+
+## CLI development
+
+The `argus` CLI lives in [`cli/`](cli/) as its own Cargo crate. It wraps the
+relay HTTP API at `http://127.0.0.1:8787`, so the relay must be running
+(`npm run relay:dev`) for most commands to work.
+
+Run it during development without installing:
+
+```bash
+cargo run --manifest-path cli/Cargo.toml -- doctor
+cargo run --manifest-path cli/Cargo.toml -- triggers list
+cargo run --manifest-path cli/Cargo.toml -- missions list --all
+```
+
+Format and check the crate:
+
+```bash
+cargo fmt --manifest-path cli/Cargo.toml --all
+cargo check --manifest-path cli/Cargo.toml
+```
+
+### Cutting a CLI release
+
+Push a git tag that matches `cli-vX.Y.Z` (bump the `version` in
+`cli/Cargo.toml` first):
+
+```bash
+git tag cli-v0.1.0
+git push origin cli-v0.1.0
+```
+
+[`.github/workflows/cli-release.yml`](.github/workflows/cli-release.yml)
+builds four tarballs (darwin arm64 / darwin x64 / linux x64 / linux arm64),
+generates `SHASUMS256.txt`, and publishes them alongside `install.sh` as a
+GitHub Release.
 
 ## Pull request guidelines
 
