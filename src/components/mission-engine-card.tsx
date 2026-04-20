@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CheckmarkCircle02Icon, Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
+import { CheckmarkCircle02Icon, Loading03Icon, SearchVisualIcon } from "@hugeicons/core-free-icons"
 import { Link } from "@tanstack/react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -365,7 +365,7 @@ function MissionEngineCard() {
           {scanning ? (
             <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
           ) : (
-            <HugeIcon icon={RefreshIcon} size={12} />
+            <HugeIcon icon={SearchVisualIcon} size={12} />
           )}
           Scan now
         </Button>

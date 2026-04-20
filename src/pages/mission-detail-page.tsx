@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
 import {
-  Alert02Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
   Clock01Icon,
@@ -8,9 +7,8 @@ import {
   FullSignalIcon,
   Loading03Icon,
   Settings01Icon,
-  UserIcon,
 } from "@hugeicons/core-free-icons"
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
+import { useNavigate, useRouterState } from "@tanstack/react-router"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -200,7 +198,7 @@ function ArtifactCard({ action }: { action: MissionAction }) {
           </div>
         )}
       </div>
-      <div className="px-5 py-4 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-2 [&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
+      <div className="px-5 py-4 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-2 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.body}</ReactMarkdown>
       </div>
     </div>
@@ -249,12 +247,12 @@ function StatusPanel({ status, priority, urgent }: { status: string; priority: s
     <div className="space-y-3">
       <p className="text-[12px] font-medium text-white/40">Status</p>
       <div className="space-y-2">
-        <div className={cn("flex items-center gap-2 text-[13px]", statusMeta.textClass)}>
-          <HugeIcon icon={statusMeta.icon} size={14} className={statusMeta.iconClass} />
+        <div className={cn("flex items-center gap-2 text-[12px]", statusMeta.textClass)}>
+          <HugeIcon icon={statusMeta.icon} size={12} className={statusMeta.iconClass} />
           <span className="font-medium">{statusMeta.label}</span>
         </div>
-        <div className="flex items-center gap-2 text-[13px]">
-          <HugeIcon icon={FullSignalIcon} size={14} className={priorityIconClass} />
+        <div className="flex items-center gap-2 text-[12px]">
+          <HugeIcon icon={FullSignalIcon} size={12} className={priorityIconClass} />
           <span className={priorityTextClass}>{priorityText}</span>
         </div>
       </div>
@@ -271,7 +269,6 @@ function MissionDetailPage() {
 
   const [data, setData] = useState<MissionDetailResponse | null>(null)
   const [agent, setAgent] = useState<AgentConfig | null>(null)
-  const [agentLoaded, setAgentLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
@@ -304,14 +301,9 @@ function MissionDetailPage() {
     let cancelled = false
     getAgent()
       .then((result) => {
-        if (!cancelled) {
-          setAgent(result)
-          setAgentLoaded(true)
-        }
+        if (!cancelled) setAgent(result)
       })
-      .catch(() => {
-        if (!cancelled) setAgentLoaded(true)
-      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -404,7 +396,7 @@ function MissionDetailPage() {
                 </Badge>
               )}
             </div>
-            <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] text-white">{mission.title}</h1>
+            <h1 className="text-lg leading-snug font-semibold tracking-[-0.01em] text-white">{mission.title}</h1>
           </div>
 
           <div className="space-y-3">
@@ -505,7 +497,7 @@ function MissionDetailPage() {
           )}
         </div>
 
-        <aside className="space-y-6">
+        <aside className="space-y-6 lg:sticky lg:top-2 lg:self-start lg:max-h-[calc(100svh-5rem)] lg:overflow-y-auto lg:pr-1">
           <div className="space-y-3">
             <p className="text-[12px] font-medium text-white/40">Actions</p>
             <div className="space-y-1.5">
@@ -557,34 +549,11 @@ function MissionDetailPage() {
 
           <div className="space-y-3 border-t border-white/6 pt-5">
             <p className="text-[12px] font-medium text-white/40">Confidence</p>
-            <div className="flex items-center gap-2 text-[13px] text-white/75">
-              <HugeIcon icon={Cursor01Icon} size={14} className="text-white/40" />
+            <div className="flex items-center gap-2 text-[12px] text-white/75">
+              <HugeIcon icon={Cursor01Icon} size={12} className="text-white/40" />
               <span>{mission.confidence.toFixed(2)}</span>
               {mission.confidenceLabel && <span className="text-white/45">· {mission.confidenceLabel}</span>}
             </div>
-          </div>
-
-          <div className="space-y-3 border-t border-white/6 pt-5">
-            <p className="text-[12px] font-medium text-white/40">Agent</p>
-            {agent ? (
-              <div className="text-[13px] text-white/75">
-                <div className="flex items-center gap-2">
-                  <HugeIcon icon={UserIcon} size={14} className="text-white/40" />
-                  <span className="font-medium text-white">{agent.name}</span>
-                </div>
-                <p className="mt-1 ml-[22px] truncate font-mono text-[11px] text-white/45">{agent.command}</p>
-              </div>
-            ) : agentLoaded ? (
-              <Link to="/agents" className="flex items-center gap-2 text-[13px] text-amber-300/90 hover:text-amber-200">
-                <HugeIcon icon={Alert02Icon} size={14} />
-                <span>No agent configured</span>
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2 text-[13px] text-white/40">
-                <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
-                <span>Loading…</span>
-              </div>
-            )}
           </div>
         </aside>
       </div>

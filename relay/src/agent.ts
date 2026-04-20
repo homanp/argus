@@ -207,20 +207,46 @@ async function checkCliInstalled(): Promise<{
   path: string | null
   version: string | null
 }> {
+  // Resolution order:
+  //   1. `which argus` — honours the user's PATH when the relay was able to
+  //      inherit the updated shell env.
+  //   2. The installer's default location (`$ARGUS_BIN_DIR` or
+  //      `~/.argus/bin/argus`) — this is the path `install.sh` drops the
+  //      binary into. Checking it as a fallback means the UI picks up a
+  //      freshly-installed CLI even when the relay process started before
+  //      the installer edited the user's shell rc, so `PATH` in this
+  //      process still doesn't include `~/.argus/bin`.
   let binPath: string | null = null
   try {
     const { stdout } = await execFileAsync("which", ["argus"])
     binPath = stdout.trim() || null
   } catch {
+    // fall through to the installer-location fallback below
+  }
+
+  if (!binPath) {
+    const fallbackDir = process.env.ARGUS_BIN_DIR || path.join(os.homedir(), ".argus", "bin")
+    const fallbackBin = path.join(fallbackDir, "argus")
+    try {
+      const stat = fs.statSync(fallbackBin)
+      if (stat.isFile()) binPath = fallbackBin
+    } catch {
+      // not installed
+    }
+  }
+
+  if (!binPath) {
     return { installed: false, path: null, version: null }
   }
 
   // Best-effort version capture. `argus --version` is stable across clap
   // versions and prints `argus <version>`. We time-box the call so a broken
-  // binary on PATH can't stall the UI's validation step.
+  // binary can't stall the UI's validation step. Invoke via the resolved
+  // path (not bare `argus`) so the fallback branch works even when the
+  // binary isn't on this process's PATH.
   let version: string | null = null
   try {
-    const { stdout } = await execFileAsync("argus", ["--version"], { timeout: 2000 })
+    const { stdout } = await execFileAsync(binPath, ["--version"], { timeout: 2000 })
     const match = stdout.match(/([0-9][0-9A-Za-z.+-]*)/)
     version = match ? match[1] : stdout.trim() || null
   } catch {
