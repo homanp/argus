@@ -5,6 +5,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import { getConfiguredAgent, runAgent } from "./agent.js"
 import type * as schema from "./db/schema.js"
 import { agent as agentTable, schedules, scheduleExecutions } from "./db/schema.js"
+import { emitEvent } from "./events.js"
 import { ensureMissionSettings, missionEngineTick } from "./mission-engine.js"
 
 type DB = BetterSQLite3Database<typeof schema>
@@ -76,6 +77,10 @@ function tick(db: DB) {
           .returning()
           .all()
 
+        // Notify SSE subscribers so the sidebar's recent sessions list and
+        // the schedules page (lastRunAt) update immediately.
+        emitEvent("schedules")
+
         console.log(`Schedule "${schedule.name}" fired → dispatching to agent`)
 
         runAgent(configured.command, schedule.prompt)
@@ -94,6 +99,7 @@ function tick(db: DB) {
               .where(eq(agentTable.id, "default"))
               .run()
 
+            emitEvent("schedules")
             console.log(`[agent] schedule "${schedule.name}" → exit ${result.exitCode}`)
           })
           .catch((err) => {
@@ -105,6 +111,7 @@ function tick(db: DB) {
               .where(eq(scheduleExecutions.id, execution.id))
               .run()
 
+            emitEvent("schedules")
             console.error(`[agent] schedule "${schedule.name}" failed:`, message)
           })
       } else {
@@ -118,6 +125,7 @@ function tick(db: DB) {
           })
           .run()
 
+        emitEvent("schedules")
         console.log(`Schedule "${schedule.name}" fired (no agent configured)`)
       }
     } catch (err) {
