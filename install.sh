@@ -212,20 +212,42 @@ append_path_line_fish() {
   MODIFIED_RCS="${MODIFIED_RCS:-}${MODIFIED_RCS:+ }$rc"
 }
 
+pick_bash_login_rc() {
+  # Bash login shells read the FIRST existing file from this ordered list:
+  #   ~/.bash_profile, ~/.bash_login, ~/.profile
+  # and silently skip the rest. So we must only append to a file that is
+  # already in play — creating ~/.bash_profile when the user only has
+  # ~/.profile would shadow .profile on every login and break their env.
+  #
+  # Strategy: prefer whichever login rc already exists; fall back to
+  # creating ~/.profile (the most portable POSIX login rc — sh, dash, and
+  # bash all honor it).
+  if [ -f "$HOME/.bash_profile" ]; then
+    printf '%s\n' "$HOME/.bash_profile"
+  elif [ -f "$HOME/.bash_login" ]; then
+    printf '%s\n' "$HOME/.bash_login"
+  else
+    printf '%s\n' "$HOME/.profile"
+  fi
+}
+
 wire_shell_path() {
   MODIFIED_RCS=""
 
-  # zsh: login + interactive
+  # zsh: ~/.zshenv is sourced by every zsh invocation (login + interactive
+  # + non-interactive). Creating it does not shadow any other zsh rc.
   append_path_line_posix "$HOME/.zshenv"
 
-  # bash: login shells (macOS Terminal) + interactive (Linux default)
-  append_path_line_posix "$HOME/.bash_profile"
+  # bash interactive non-login (Linux default): standalone file, no
+  # fallback chain to worry about, safe to create.
   append_path_line_posix "$HOME/.bashrc"
 
-  # generic POSIX fallback
-  append_path_line_posix "$HOME/.profile"
+  # bash / sh login shells (macOS Terminal default): append to whichever
+  # login rc is already in use, falling back to ~/.profile. Never create
+  # ~/.bash_profile when ~/.profile exists — see pick_bash_login_rc.
+  append_path_line_posix "$(pick_bash_login_rc)"
 
-  # fish
+  # fish: config.fish is always read by fish; safe to create.
   append_path_line_fish "$HOME/.config/fish/config.fish"
 }
 
