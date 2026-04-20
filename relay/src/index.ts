@@ -1117,6 +1117,10 @@ async function evaluateTriggers(
         })
         .returning()
 
+      // Notify SSE subscribers so the sidebar's recent sessions list and
+      // the triggers page (executionCount / lastFiredAt) update immediately.
+      emitEvent("triggers")
+
       fired += 1
       const deliver = async (
         agentResult?: string | null,
@@ -1150,6 +1154,7 @@ async function evaluateTriggers(
         const configured = getConfiguredAgent(db)
         if (configured && configured.status === "active") {
           db.update(triggerExecutions).set({ status: "running" }).where(eq(triggerExecutions.id, execution.id)).run()
+          emitEvent("triggers")
 
           const enrichedPrompt = buildTriggerContext(trigger, provider, eventType, payload, channelTargets)
           runAgent(configured.command, enrichedPrompt)
@@ -1169,6 +1174,7 @@ async function evaluateTriggers(
                 .set({ lastUsedAt: finished, updatedAt: finished })
                 .where(eq(agentTable.id, "default"))
                 .run()
+              emitEvent("triggers")
               void deliver(resultMessage.slice(0, 2000), structuredResult)
               console.log(`[agent] trigger "${trigger.name}" → exit ${result.exitCode}`)
             })
@@ -1177,6 +1183,7 @@ async function evaluateTriggers(
                 .set({ status: "failed", finishedAt: new Date().toISOString(), resultMessage: String(err) })
                 .where(eq(triggerExecutions.id, execution.id))
                 .run()
+              emitEvent("triggers")
               void deliver(String(err).slice(0, 2000))
               console.error(`[agent] trigger "${trigger.name}" failed:`, err)
             })
