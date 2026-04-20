@@ -178,11 +178,13 @@ npm run tauri dev
 4. paste the token and click **connect github**
 5. select the repos you want to watch — each one gets a unique webhook URL and secret
 6. expand a repo to see the webhook URL and secret, then add a webhook in your github repo settings:
-   - **settings → webhooks → add webhook**
-   - paste the payload URL
-   - set content type to `application/json`
-   - paste the secret
-   - choose which events to subscribe to
+
+- **settings → webhooks → add webhook**
+- paste the payload URL
+- set content type to `application/json`
+- paste the secret
+- choose which events to subscribe to
+
 7. click **test webhook** to verify the local path works, then push a commit or open a PR to see real events flow through
 
 ### connect your coding agent
@@ -211,16 +213,12 @@ npx skills add argus-ai/argus
 
 **install the argus cli:**
 
-the argus CLI lets you manage triggers, schedules, missions, and your agent configuration from the terminal without opening the desktop app:
+the argus CLI lets you manage triggers, schedules, missions, and your agent configuration from the terminal without opening the desktop app.
+
+while no CLI release has been cut yet, install `install.sh` directly from the `main` branch:
 
 ```bash
-curl -fsSL https://argus.dev/install | bash
-```
-
-if you don't have the argus.dev vanity URL set up yet, install directly from the GitHub release asset:
-
-```bash
-curl -fsSL https://github.com/homanp/argus/releases/latest/download/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/homanp/argus/main/install.sh | bash
 ```
 
 pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and prints the `export PATH=…` line to add to your shell rc.
