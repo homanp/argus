@@ -189,6 +189,7 @@ function createDatabase(databasePath: string) {
       enabled INTEGER NOT NULL DEFAULT 1,
       interval_minutes INTEGER NOT NULL DEFAULT 60,
       lookback_minutes INTEGER NOT NULL DEFAULT 120,
+      mission_channel_provider TEXT,
       last_scan_at TEXT,
       next_scan_at TEXT,
       last_scan_summary_json TEXT,
@@ -251,6 +252,11 @@ function createDatabase(databasePath: string) {
     sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN status TEXT")
     sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN finished_at TEXT")
     sqlite.exec("ALTER TABLE trigger_executions ADD COLUMN result_message TEXT")
+  }
+
+  const missionSettingsCols = sqlite.pragma("table_info(mission_settings)") as { name: string }[]
+  if (!missionSettingsCols.some((col) => col.name === "mission_channel_provider")) {
+    sqlite.exec("ALTER TABLE mission_settings ADD COLUMN mission_channel_provider TEXT")
   }
 
   const agentColumns = sqlite.pragma("table_info(agent)") as { name: string }[]

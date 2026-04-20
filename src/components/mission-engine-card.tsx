@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useState } from "react"
-import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { CheckmarkCircle02Icon, Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
 import { Link } from "@tanstack/react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { HugeIcon } from "@/components/ui/huge-icon"
-import { getMissionSettings, scanMissionsNow, updateMissionSettings } from "@/lib/relay-api"
-import type { MissionSettings } from "@/lib/relay-api"
+import { channelCatalog } from "@/lib/channel-catalog"
+import {
+  getChannels,
+  getMissionSettings,
+  scanMissionsNow,
+  sendMissionChannelTest,
+  updateMissionSettings,
+} from "@/lib/relay-api"
+import type { ChannelProvider, ChannelState, MissionSettings } from "@/lib/relay-api"
 import { useRelayEvent } from "@/lib/relay-events"
 import { cn } from "@/lib/utils"
 
@@ -51,9 +58,14 @@ function inUntil(iso: string | null | undefined) {
 
 function MissionEngineCard() {
   const [settings, setSettings] = useState<MissionSettings | null>(null)
+  const [channels, setChannels] = useState<ChannelState[]>([])
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testingChannel, setTestingChannel] = useState(false)
+  const [testStatus, setTestStatus] = useState<"idle" | "sent" | "error">("idle")
+  const [testMessage, setTestMessage] = useState<string | null>(null)
+  const testTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const reload = useCallback(async () => {
     try {
@@ -65,13 +77,28 @@ function MissionEngineCard() {
     }
   }, [])
 
+  const reloadChannels = useCallback(async () => {
+    try {
+      const list = await getChannels()
+      setChannels(list)
+    } catch {
+      // Channel loading is optional; UI will render "no channels connected".
+    }
+  }, [])
+
   useEffect(() => {
     reload()
-  }, [reload])
+    reloadChannels()
+  }, [reload, reloadChannels])
 
   useRelayEvent("missions", reload)
+  useRelayEvent("channels", reloadChannels)
 
-  async function patch(update: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes">>) {
+  async function patch(
+    update: Partial<
+      Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes" | "missionChannelProvider">
+    >,
+  ) {
     if (!settings) return
     setSaving(true)
     try {
@@ -82,6 +109,40 @@ function MissionEngineCard() {
       setError(err instanceof Error ? err.message : "Failed to save settings.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const connectedChannels = channels.filter((c) => c.status === "connected")
+
+  function selectMissionChannel(provider: ChannelProvider | null) {
+    if ((settings?.missionChannelProvider ?? null) === provider) return
+    void patch({ missionChannelProvider: provider })
+    setTestStatus("idle")
+    setTestMessage(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (testTimerRef.current) clearTimeout(testTimerRef.current)
+    }
+  }, [])
+
+  async function handleSendTest() {
+    if (!settings?.missionChannelProvider) return
+    if (testTimerRef.current) clearTimeout(testTimerRef.current)
+    setTestingChannel(true)
+    setTestStatus("idle")
+    setTestMessage(null)
+    try {
+      await sendMissionChannelTest()
+      setTestStatus("sent")
+      setTestMessage(null)
+      testTimerRef.current = setTimeout(() => setTestStatus("idle"), 4000)
+    } catch (err) {
+      setTestStatus("error")
+      setTestMessage(err instanceof Error ? err.message : "Failed to send test mission.")
+    } finally {
+      setTestingChannel(false)
     }
   }
 
@@ -157,6 +218,102 @@ function MissionEngineCard() {
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="space-y-2 border-t border-white/6 px-4 py-4">
+        <div className="flex items-baseline justify-between">
+          <label className="text-[12px] font-medium text-white/60">Mission channel</label>
+          <span className="text-[11px] text-white/30">Argus posts newly surfaced missions here.</span>
+        </div>
+        {connectedChannels.length > 0 ? (
+          <div className="space-y-2">
+            {connectedChannels.map((channel) => {
+              const meta = channelCatalog.find((item) => item.provider === channel.provider)
+              const checked = settings.missionChannelProvider === channel.provider
+              return (
+                <label
+                  key={channel.provider}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-between rounded-md border bg-white/[0.02] px-3 py-2 transition-colors",
+                    checked ? "border-violet-300/40 bg-violet-300/[0.04]" : "border-white/8 hover:bg-white/[0.03]",
+                    saving && "pointer-events-none opacity-60",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/8">
+                      {meta?.image ? (
+                        <img
+                          src={meta.image}
+                          alt={channel.displayName}
+                          className={cn("size-4 object-contain", meta.imageClassName?.replace("size-5", "size-4"))}
+                        />
+                      ) : meta ? (
+                        <HugeIcon icon={meta.icon} size={14} className="text-white/60" />
+                      ) : null}
+                    </div>
+                    <div>
+                      <p className="text-[12px] text-white/70">{channel.displayName}</p>
+                      <p className="text-[11px] text-white/30">Configured and ready to send.</p>
+                    </div>
+                  </div>
+                  <input
+                    type="radio"
+                    name="mission-channel"
+                    checked={checked}
+                    onChange={() => selectMissionChannel(channel.provider)}
+                    onClick={() => {
+                      if (checked) selectMissionChannel(null)
+                    }}
+                    className="size-3.5 border-white/15 bg-transparent accent-violet-300"
+                  />
+                </label>
+              )
+            })}
+            {settings.missionChannelProvider && (
+              <div className="flex items-center justify-between pt-0.5">
+                <div className="flex items-center gap-3 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => selectMissionChannel(null)}
+                    disabled={saving || testingChannel}
+                    className="text-white/40 transition-colors hover:text-white/70 disabled:opacity-60"
+                  >
+                    Clear selection
+                  </button>
+                  {testStatus === "sent" && (
+                    <span className="flex items-center gap-1 text-emerald-300/80">
+                      <HugeIcon icon={CheckmarkCircle02Icon} size={12} />
+                      Test sent
+                    </span>
+                  )}
+                  {testStatus === "error" && testMessage && <span className="text-rose-200/80">{testMessage}</span>}
+                </div>
+                <Button
+                  onClick={() => void handleSendTest()}
+                  disabled={saving || testingChannel}
+                  variant="outline"
+                  className="border-white/10 bg-transparent text-[11px] font-normal text-white/60 hover:bg-white/[0.04] hover:text-white"
+                >
+                  {testingChannel ? (
+                    <>
+                      <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send test"
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-[12px] text-white/30">
+            <Link to="/channels" className="text-violet-200/80 hover:text-violet-100">
+              Connect a channel
+            </Link>{" "}
+            first to receive missions.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-white/6 px-4 py-3 text-[11px] text-white/45">

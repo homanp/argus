@@ -167,6 +167,7 @@ const missionSettings = sqliteTable("mission_settings", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   intervalMinutes: integer("interval_minutes").notNull().default(60),
   lookbackMinutes: integer("lookback_minutes").notNull().default(120),
+  missionChannelProvider: text("mission_channel_provider"),
   lastScanAt: text("last_scan_at"),
   nextScanAt: text("next_scan_at"),
   lastScanSummaryJson: text("last_scan_summary_json"),
