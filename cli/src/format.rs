@@ -17,14 +17,12 @@ impl Output {
         self.json
     }
 
-    /// Emit a single value (either a serde-serializable record or a JSON
-    /// `Value` already obtained from the relay).
+    /// Emit a single value as pretty-printed JSON. Call sites should first
+    /// check `is_json()` — this is the JSON-mode escape hatch for records
+    /// built on the fly (e.g. `{ "ok": true }` acknowledgements) that don't
+    /// already exist as a `serde_json::Value`.
     pub fn emit<T: Serialize>(&self, value: &T) -> anyhow::Result<()> {
-        if self.json {
-            println!("{}", serde_json::to_string_pretty(value)?);
-        } else {
-            println!("{}", serde_json::to_string_pretty(value)?);
-        }
+        println!("{}", serde_json::to_string_pretty(value)?);
         Ok(())
     }
 

@@ -207,10 +207,10 @@ async function checkCliInstalled(): Promise<{
   path: string | null
   version: string | null
 }> {
-  let path: string | null = null
+  let binPath: string | null = null
   try {
     const { stdout } = await execFileAsync("which", ["argus"])
-    path = stdout.trim() || null
+    binPath = stdout.trim() || null
   } catch {
     return { installed: false, path: null, version: null }
   }
@@ -227,7 +227,7 @@ async function checkCliInstalled(): Promise<{
     version = null
   }
 
-  return { installed: true, path, version }
+  return { installed: true, path: binPath, version }
 }
 
 export { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, parseCommand, runAgent }
