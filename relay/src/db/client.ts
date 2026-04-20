@@ -140,6 +140,97 @@ function createDatabase(databasePath: string) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS missions (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'awaiting_decision',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      urgent INTEGER NOT NULL DEFAULT 0,
+      source_provider TEXT NOT NULL,
+      source_event_type TEXT NOT NULL,
+      trigger_webhook_event_id INTEGER,
+      title TEXT NOT NULL,
+      analysis_markdown TEXT NOT NULL,
+      recommendation TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 0,
+      confidence_label TEXT,
+      agent_name TEXT,
+      channel_hint TEXT,
+      plan_json TEXT NOT NULL,
+      actions_json TEXT NOT NULL,
+      metadata_json TEXT NOT NULL,
+      decided_action_key TEXT,
+      decided_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mission_id TEXT NOT NULL,
+      webhook_event_id INTEGER NOT NULL,
+      label TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_executions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mission_id TEXT NOT NULL,
+      action_key TEXT NOT NULL,
+      prompt_sent TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      result_message TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_settings (
+      id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      interval_minutes INTEGER NOT NULL DEFAULT 60,
+      lookback_minutes INTEGER NOT NULL DEFAULT 120,
+      last_scan_at TEXT,
+      next_scan_at TEXT,
+      last_scan_summary_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS operating_doc (
+      id TEXT PRIMARY KEY,
+      markdown TEXT NOT NULL,
+      updated_by TEXT NOT NULL DEFAULT 'user',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS operating_doc_updates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      before TEXT NOT NULL,
+      after TEXT NOT NULL,
+      diff TEXT,
+      reason TEXT,
+      source TEXT NOT NULL DEFAULT 'decision',
+      mission_id TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mission_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      action_key TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mission_suppressions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scan_id TEXT NOT NULL,
+      candidate_json TEXT NOT NULL,
+      verdict TEXT NOT NULL DEFAULT 'suppress',
+      reason TEXT,
+      created_at TEXT NOT NULL
+    );
   `)
 
   const repoColumns = sqlite.pragma("table_info(github_repositories)") as { name: string }[]

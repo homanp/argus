@@ -5,6 +5,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import { getConfiguredAgent, runAgent } from "./agent.js"
 import type * as schema from "./db/schema.js"
 import { agent as agentTable, schedules, scheduleExecutions } from "./db/schema.js"
+import { ensureMissionSettings, missionEngineTick } from "./mission-engine.js"
 
 type DB = BetterSQLite3Database<typeof schema>
 type ScheduleRow = typeof schedules.$inferSelect
@@ -128,6 +129,7 @@ function tick(db: DB) {
 
 export function startScheduler(db: DB) {
   refreshStaleSchedules(db)
+  ensureMissionSettings(db)
 
   const timer = setInterval(() => {
     try {
@@ -136,12 +138,22 @@ export function startScheduler(db: DB) {
       const message = err instanceof Error ? err.message : String(err)
       console.error(`Scheduler tick failed: ${message}`)
     }
+    try {
+      missionEngineTick(db)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`Mission engine tick failed: ${message}`)
+    }
   }, TICK_INTERVAL_MS)
 
   const enabledCount = db.select().from(schedules).where(eq(schedules.enabled, true)).all().length
+  const missionCfg = ensureMissionSettings(db)
 
   console.log(
     `Scheduler started (${enabledCount} active schedule${enabledCount !== 1 ? "s" : ""}, tick every ${TICK_INTERVAL_MS / 1000}s)`,
+  )
+  console.log(
+    `Mission engine ${missionCfg.enabled ? "enabled" : "disabled"} (every ${missionCfg.intervalMinutes}m, ${missionCfg.lookbackMinutes}m lookback)`,
   )
 
   return timer

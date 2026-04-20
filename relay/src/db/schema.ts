@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
 const timestamps = {
   createdAt: text("created_at").notNull(),
@@ -120,6 +120,94 @@ const scheduleExecutions = sqliteTable("schedule_executions", {
   resultMessage: text("result_message"),
 })
 
+const missions = sqliteTable("missions", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull().default("awaiting_decision"),
+  priority: text("priority").notNull().default("normal"),
+  urgent: integer("urgent", { mode: "boolean" }).notNull().default(false),
+  sourceProvider: text("source_provider").notNull(),
+  sourceEventType: text("source_event_type").notNull(),
+  triggerWebhookEventId: integer("trigger_webhook_event_id"),
+  title: text("title").notNull(),
+  analysisMarkdown: text("analysis_markdown").notNull(),
+  recommendation: text("recommendation").notNull(),
+  confidence: real("confidence").notNull().default(0),
+  confidenceLabel: text("confidence_label"),
+  agentName: text("agent_name"),
+  channelHint: text("channel_hint"),
+  planJson: text("plan_json").notNull(),
+  actionsJson: text("actions_json").notNull(),
+  metadataJson: text("metadata_json").notNull(),
+  decidedActionKey: text("decided_action_key"),
+  decidedAt: text("decided_at"),
+  ...timestamps,
+})
+
+const missionSignals = sqliteTable("mission_signals", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  missionId: text("mission_id").notNull(),
+  webhookEventId: integer("webhook_event_id").notNull(),
+  label: text("label"),
+  createdAt: text("created_at").notNull(),
+})
+
+const missionExecutions = sqliteTable("mission_executions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  missionId: text("mission_id").notNull(),
+  actionKey: text("action_key").notNull(),
+  promptSent: text("prompt_sent").notNull(),
+  status: text("status").notNull().default("pending"),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  resultMessage: text("result_message"),
+})
+
+const missionSettings = sqliteTable("mission_settings", {
+  id: text("id").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  intervalMinutes: integer("interval_minutes").notNull().default(60),
+  lookbackMinutes: integer("lookback_minutes").notNull().default(120),
+  lastScanAt: text("last_scan_at"),
+  nextScanAt: text("next_scan_at"),
+  lastScanSummaryJson: text("last_scan_summary_json"),
+  ...timestamps,
+})
+
+const operatingDoc = sqliteTable("operating_doc", {
+  id: text("id").primaryKey(),
+  markdown: text("markdown").notNull(),
+  updatedBy: text("updated_by").notNull().default("user"),
+  ...timestamps,
+})
+
+const operatingDocUpdates = sqliteTable("operating_doc_updates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  before: text("before").notNull(),
+  after: text("after").notNull(),
+  diff: text("diff"),
+  reason: text("reason"),
+  source: text("source").notNull().default("decision"),
+  missionId: text("mission_id"),
+  createdAt: text("created_at").notNull(),
+})
+
+const missionDecisions = sqliteTable("mission_decisions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  missionId: text("mission_id").notNull(),
+  kind: text("kind").notNull(),
+  actionKey: text("action_key"),
+  createdAt: text("created_at").notNull(),
+})
+
+const missionSuppressions = sqliteTable("mission_suppressions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  scanId: text("scan_id").notNull(),
+  candidateJson: text("candidate_json").notNull(),
+  verdict: text("verdict").notNull().default("suppress"),
+  reason: text("reason"),
+  createdAt: text("created_at").notNull(),
+})
+
 const agent = sqliteTable("agent", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -139,6 +227,14 @@ export {
   githubRepositories,
   githubWebhookEvents,
   integrations,
+  missionDecisions,
+  missionExecutions,
+  missionSettings,
+  missionSignals,
+  missionSuppressions,
+  missions,
+  operatingDoc,
+  operatingDocUpdates,
   scheduleExecutions,
   schedules,
   triggerDeliveryAttempts,

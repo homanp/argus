@@ -165,13 +165,99 @@ type ScheduleDetailResponse = {
 
 type RecentSession = {
   id: string
-  type: "trigger" | "schedule"
+  type: "trigger" | "schedule" | "mission"
   sourceId: string
   name: string
   status: string
   startedAt: string
   finishedAt: string | null
   resultMessage: string | null
+}
+
+type MissionActionSummary = {
+  key: string
+  label: string
+  hotkey: string
+}
+
+type MissionSummary = {
+  id: string
+  status: "awaiting_decision" | "decided" | "dismissed" | string
+  priority: "low" | "normal" | "high" | string
+  urgent: boolean
+  sourceProvider: string
+  sourceEventType: string
+  title: string
+  recommendation: string
+  analysisMarkdown: string
+  confidence: number
+  confidenceLabel: string | null
+  agentName: string | null
+  decidedActionKey: string | null
+  decidedAt: string | null
+  createdAt: string
+  updatedAt: string
+  actions: MissionActionSummary[]
+  actionLabels: string[]
+}
+
+type MissionPlanStep = {
+  step: number
+  description: string
+  tool: string
+  estimate: string
+  reversibility: "reversible" | "auto" | "attention"
+  reversibilityLabel?: string
+}
+
+type MissionArtifactKind = "markdown" | "email" | "github_comment" | "slack_message"
+
+type MissionArtifact = {
+  kind: MissionArtifactKind
+  title?: string
+  body: string
+  recipient?: string
+}
+
+type MissionAction = {
+  key: string
+  label: string
+  hotkey: string
+  actionPrompt: string
+  artifact?: MissionArtifact
+}
+
+type Mission = Omit<MissionSummary, "actions"> & {
+  plan: MissionPlanStep[]
+  actions: MissionAction[]
+}
+
+type MissionSignal = {
+  id: number
+  label: string | null
+  createdAt: string
+  webhookEventId: number | null
+  eventType: string | null
+  source: string | null
+  repositoryId: string | null
+  payload: Record<string, unknown> | null
+  receivedAt: string | null
+}
+
+type MissionExecution = {
+  id: number
+  actionKey: string
+  promptSent: string
+  status: "pending" | "running" | "completed" | "failed" | string
+  startedAt: string
+  finishedAt: string | null
+  resultMessage: string | null
+}
+
+type MissionDetailResponse = {
+  mission: Mission
+  signals: MissionSignal[]
+  executions: MissionExecution[]
 }
 
 const RELAY_BASE_URL = "http://127.0.0.1:8787"
@@ -436,6 +522,136 @@ async function getRecentSessions() {
   return request<RecentSession[]>("/api/sessions/recent")
 }
 
+async function getMissions() {
+  return request<MissionSummary[]>("/api/missions")
+}
+
+async function getMission(missionId: string) {
+  return request<MissionDetailResponse>(`/api/missions/${missionId}`)
+}
+
+async function decideMission(missionId: string, actionKey: string) {
+  return request<{ ok: true; actionKey: string }>(`/api/missions/${missionId}/decide`, {
+    method: "POST",
+    body: JSON.stringify({ actionKey }),
+  })
+}
+
+async function dismissMission(missionId: string) {
+  return request<{ ok: true }>(`/api/missions/${missionId}/dismiss`, {
+    method: "POST",
+  })
+}
+
+async function deleteMission(missionId: string) {
+  return request<{ ok: true }>(`/api/missions/${missionId}`, {
+    method: "DELETE",
+  })
+}
+
+// ── Mission engine ──
+
+type MissionScanSummary = {
+  scanId: string
+  startedAt: string
+  finishedAt: string | null
+  windowMinutes: number
+  eventCount: number
+  groupCount: number
+  candidateCount: number
+  surfacedCount: number
+  suppressedCount: number
+  missionIds: string[]
+  error?: string
+}
+
+type MissionSettings = {
+  id: string
+  enabled: boolean
+  intervalMinutes: number
+  lookbackMinutes: number
+  lastScanAt: string | null
+  nextScanAt: string | null
+  lastScanSummary: MissionScanSummary | null
+  createdAt: string
+  updatedAt: string
+}
+
+type MissionSuppression = {
+  id: number
+  scanId: string
+  verdict: string
+  reason: string | null
+  createdAt: string
+  candidate: unknown
+}
+
+type OperatingDoc = {
+  markdown: string
+  updatedBy: "user" | "agent" | "system" | string
+  updatedAt: string
+  createdAt: string
+}
+
+type OperatingDocUpdate = {
+  id: number
+  before: string
+  after: string
+  diff: string | null
+  reason: string | null
+  source: "decision" | "manual" | string
+  missionId: string | null
+  createdAt: string
+}
+
+async function getMissionSettings() {
+  return request<MissionSettings>("/api/mission-settings")
+}
+
+async function updateMissionSettings(
+  patch: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes">>,
+) {
+  return request<MissionSettings>("/api/mission-settings", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  })
+}
+
+async function scanMissionsNow() {
+  return request<{ ok: true; startedAt: string }>("/api/missions/scan", {
+    method: "POST",
+  })
+}
+
+async function getMissionSuppressions(params: { scanId?: string; limit?: number } = {}) {
+  const query = new URLSearchParams()
+  if (params.scanId) query.set("scanId", params.scanId)
+  if (params.limit) query.set("limit", String(params.limit))
+  const suffix = query.toString() ? `?${query.toString()}` : ""
+  return request<MissionSuppression[]>(`/api/mission-suppressions${suffix}`)
+}
+
+async function getOperatingDoc() {
+  return request<OperatingDoc>("/api/operating-doc")
+}
+
+async function updateOperatingDoc(markdown: string) {
+  return request<OperatingDoc>("/api/operating-doc", {
+    method: "PUT",
+    body: JSON.stringify({ markdown }),
+  })
+}
+
+async function getOperatingDocUpdates(limit = 50) {
+  return request<OperatingDocUpdate[]>(`/api/operating-doc/updates?limit=${limit}`)
+}
+
+async function revertOperatingDocUpdate(updateId: number) {
+  return request<OperatingDoc>(`/api/operating-doc/updates/${updateId}/revert`, {
+    method: "POST",
+  })
+}
+
 async function validateAgent() {
   return request<ValidateResult>("/api/agent/validate", {
     method: "POST",
@@ -451,15 +667,24 @@ export {
   connectGitHub,
   createSchedule,
   createTrigger,
+  decideMission,
+  deleteMission,
   detectAgents,
   deleteSchedule,
   deleteTrigger,
   discoverTelegramChats,
+  dismissMission,
   getAgent,
   getChannel,
   getChannels,
   getGitHubAvailableEvents,
   getGitHubIntegration,
+  getMission,
+  getMissionSettings,
+  getMissionSuppressions,
+  getMissions,
+  getOperatingDoc,
+  getOperatingDocUpdates,
   getRecentSessions,
   getScheduleExecutions,
   getSchedules,
@@ -469,10 +694,14 @@ export {
   previewSchedule,
   removeChannel,
   removeAgent,
+  revertOperatingDocUpdate,
+  scanMissionsNow,
   sendGitHubWebhookTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
   testAgent,
+  updateMissionSettings,
+  updateOperatingDoc,
   updateSchedule,
   updateTrigger,
   validateAgent,
@@ -484,6 +713,20 @@ export type {
   ChannelProvider,
   ChannelState,
   DetectedAgent,
+  Mission,
+  MissionAction,
+  MissionArtifact,
+  MissionArtifactKind,
+  MissionDetailResponse,
+  MissionExecution,
+  MissionPlanStep,
+  MissionScanSummary,
+  MissionSettings,
+  MissionSignal,
+  MissionSummary,
+  MissionSuppression,
+  OperatingDoc,
+  OperatingDocUpdate,
   TelegramDiscoveryResponse,
   ValidateResult,
   GitHubIntegrationRepository,

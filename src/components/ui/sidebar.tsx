@@ -201,7 +201,8 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
       onMouseDown={onMouseDown}
       className={cn(
         "absolute inset-y-0 z-20 hidden w-2 -right-1 cursor-col-resize select-none sm:block",
-        "after:absolute after:inset-y-4 after:left-1/2 after:w-[2px] after:rounded-full after:bg-transparent after:transition-colors hover:after:bg-white/15",
+        // Short, centered pill that only appears on hover — not a full-height track.
+        "after:absolute after:top-1/2 after:left-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:h-16 after:w-[3px] after:rounded-full after:bg-transparent after:transition-colors hover:after:bg-white/30",
         className,
       )}
       {...props}
