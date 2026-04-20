@@ -572,6 +572,7 @@ type MissionSettings = {
   enabled: boolean
   intervalMinutes: number
   lookbackMinutes: number
+  missionChannelProvider: ChannelProvider | null
   lastScanAt: string | null
   nextScanAt: string | null
   lastScanSummary: MissionScanSummary | null
@@ -611,7 +612,7 @@ async function getMissionSettings() {
 }
 
 async function updateMissionSettings(
-  patch: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes">>,
+  patch: Partial<Pick<MissionSettings, "enabled" | "intervalMinutes" | "lookbackMinutes" | "missionChannelProvider">>,
 ) {
   return request<MissionSettings>("/api/mission-settings", {
     method: "PUT",
@@ -621,6 +622,12 @@ async function updateMissionSettings(
 
 async function scanMissionsNow() {
   return request<{ ok: true; startedAt: string }>("/api/missions/scan", {
+    method: "POST",
+  })
+}
+
+async function sendMissionChannelTest() {
+  return request<{ ok: true; provider: ChannelProvider }>("/api/mission-settings/test-channel", {
     method: "POST",
   })
 }
@@ -699,6 +706,7 @@ export {
   revertOperatingDocUpdate,
   scanMissionsNow,
   sendGitHubWebhookTest,
+  sendMissionChannelTest,
   setGitHubRepositorySelected,
   syncGitHubRepositories,
   testAgent,

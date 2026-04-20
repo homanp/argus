@@ -5,6 +5,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 
 import { extractAgentJson } from "./agent-json.js"
 import { getConfiguredAgent, runAgent } from "./agent.js"
+import { deliverMissionToChannel } from "./delivery.js"
 import { emitEvent } from "./events.js"
 import * as schema from "./db/schema.js"
 import {
@@ -94,9 +95,20 @@ function ensureMissionSettings(db: DB): MissionSettingsRow {
   return db.select().from(missionSettings).where(eq(missionSettings.id, SETTINGS_ID)).get() as MissionSettingsRow
 }
 
+const MISSION_CHANNEL_PROVIDERS = ["slack", "telegram", "whatsapp", "email"] as const
+type MissionChannelProvider = (typeof MISSION_CHANNEL_PROVIDERS)[number]
+
+function isMissionChannelProvider(value: unknown): value is MissionChannelProvider {
+  return typeof value === "string" && (MISSION_CHANNEL_PROVIDERS as readonly string[]).includes(value)
+}
+
 function updateMissionSettings(
   db: DB,
-  patch: Partial<Pick<MissionSettingsRow, "enabled" | "intervalMinutes" | "lookbackMinutes" | "nextScanAt">>,
+  patch: Partial<
+    Pick<MissionSettingsRow, "enabled" | "intervalMinutes" | "lookbackMinutes" | "nextScanAt"> & {
+      missionChannelProvider: MissionChannelProvider | null
+    }
+  >,
 ): MissionSettingsRow {
   ensureMissionSettings(db)
   const updates: Partial<typeof missionSettings.$inferInsert> = { updatedAt: nowIso() }
@@ -108,6 +120,16 @@ function updateMissionSettings(
     updates.lookbackMinutes = Math.max(MIN_LOOKBACK_MINUTES, Math.min(MAX_LOOKBACK_MINUTES, patch.lookbackMinutes))
   }
   if (patch.nextScanAt !== undefined) updates.nextScanAt = patch.nextScanAt
+  if (patch.missionChannelProvider !== undefined) {
+    const value = patch.missionChannelProvider
+    if (value === null) {
+      updates.missionChannelProvider = null
+    } else if (isMissionChannelProvider(value)) {
+      updates.missionChannelProvider = value
+    } else {
+      throw new Error(`Unknown mission channel provider: ${String(value)}`)
+    }
+  }
   db.update(missionSettings).set(updates).where(eq(missionSettings.id, SETTINGS_ID)).run()
   return db.select().from(missionSettings).where(eq(missionSettings.id, SETTINGS_ID)).get() as MissionSettingsRow
 }
@@ -246,6 +268,47 @@ function loadRecentDecisions(db: DB, limit: number): RecentDecision[] {
   }))
 }
 
+// ── Mission channel delivery helpers ─────────────────────────────────────
+
+const MISSION_CHANNEL_SUMMARY_MAX = 600
+
+function buildMissionChannelSummary(candidate: MissionCandidate): string {
+  const recommendation = candidate.recommendation?.trim() || ""
+  const analysis = (candidate.analysisMarkdown || "").trim()
+  const parts: string[] = []
+  if (recommendation) parts.push(recommendation)
+  if (analysis) {
+    const remaining = MISSION_CHANNEL_SUMMARY_MAX - parts.join("\n\n").length - 2
+    if (remaining > 40) {
+      parts.push(analysis.length > remaining ? `${analysis.slice(0, remaining - 1)}…` : analysis)
+    }
+  }
+  return parts.join("\n\n") || candidate.title
+}
+
+function extractCandidateLink(db: DB, candidate: MissionCandidate): string | null {
+  const firstEventId = candidate.citedEventIds[0]
+  if (!firstEventId) return null
+  const row = db
+    .select({ payloadJson: githubWebhookEvents.payloadJson })
+    .from(githubWebhookEvents)
+    .where(eq(githubWebhookEvents.id, firstEventId))
+    .get()
+  if (!row?.payloadJson) return null
+  try {
+    const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
+    const issue = payload.issue as Record<string, unknown> | undefined
+    if (issue && typeof issue.html_url === "string") return issue.html_url
+    const pr = payload.pull_request as Record<string, unknown> | undefined
+    if (pr && typeof pr.html_url === "string") return pr.html_url
+    const repo = payload.repository as Record<string, unknown> | undefined
+    if (repo && typeof repo.html_url === "string") return repo.html_url
+  } catch {
+    // fall through
+  }
+  return null
+}
+
 // ── Scan orchestration ───────────────────────────────────────────────────
 
 async function runMissionScan(
@@ -359,6 +422,24 @@ async function runMissionScan(
       const missionId = await insertMissionFromCandidate(db, candidate, configured.name)
       summary.surfacedCount += 1
       summary.missionIds.push(missionId)
+
+      if (settings.missionChannelProvider) {
+        try {
+          const link = extractCandidateLink(db, candidate)
+          const summaryText = buildMissionChannelSummary(candidate)
+          await deliverMissionToChannel(db, {
+            provider: settings.missionChannelProvider,
+            title: candidate.title,
+            summary: summaryText,
+            link,
+          })
+        } catch (err) {
+          console.error(
+            `[mission-engine] mission ${missionId} channel delivery failed (${settings.missionChannelProvider}):`,
+            err,
+          )
+        }
+      }
     } else {
       db.insert(missionSuppressions)
         .values({

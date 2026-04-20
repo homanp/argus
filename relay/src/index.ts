@@ -8,6 +8,7 @@ import { and, count, desc, eq, inArray, max } from "drizzle-orm"
 
 import { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, runAgent } from "./agent.js"
 import {
+  deliverMissionToChannel,
   deliverNotification,
   parseStructuredAgentResult,
   type ChannelButton,
@@ -2034,6 +2035,7 @@ function serializeMissionSettings(row: MissionSettingsRow) {
     enabled: Boolean(row.enabled),
     intervalMinutes: row.intervalMinutes,
     lookbackMinutes: row.lookbackMinutes,
+    missionChannelProvider: row.missionChannelProvider ?? null,
     lastScanAt: row.lastScanAt ?? null,
     nextScanAt: row.nextScanAt ?? null,
     lastScanSummary,
@@ -2289,6 +2291,8 @@ app.get("/api/mission-settings", async (_request, response) => {
   response.json(serializeMissionSettings(row))
 })
 
+const MISSION_CHANNEL_PROVIDER_VALUES = ["slack", "telegram", "whatsapp", "email"] as const
+
 app.put("/api/mission-settings", express.json(), async (request, response) => {
   const body = request.body ?? {}
   const patch: Parameters<typeof updateMissionSettings>[1] = {}
@@ -2298,6 +2302,17 @@ app.put("/api/mission-settings", express.json(), async (request, response) => {
   }
   if (typeof body.lookbackMinutes === "number" && Number.isFinite(body.lookbackMinutes)) {
     patch.lookbackMinutes = Math.round(body.lookbackMinutes)
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "missionChannelProvider")) {
+    const raw = body.missionChannelProvider
+    if (raw === null || raw === "") {
+      patch.missionChannelProvider = null
+    } else if (typeof raw === "string" && (MISSION_CHANNEL_PROVIDER_VALUES as readonly string[]).includes(raw)) {
+      patch.missionChannelProvider = raw as (typeof MISSION_CHANNEL_PROVIDER_VALUES)[number]
+    } else {
+      response.status(400).json({ error: "Invalid missionChannelProvider." })
+      return
+    }
   }
   const row = updateMissionSettings(db, patch)
   emitEvent("missions")
@@ -2311,6 +2326,38 @@ app.post("/api/missions/scan", async (_request, response) => {
     console.error("[mission-engine] manual scan failed:", err)
   })
   response.json({ ok: true, startedAt: new Date().toISOString() })
+})
+
+app.post("/api/mission-settings/test-channel", async (_request, response) => {
+  const settings = ensureMissionSettings(db)
+  const provider = settings.missionChannelProvider
+  if (!provider) {
+    response.status(400).json({ error: "No mission channel selected." })
+    return
+  }
+
+  const channelRow = await db.select().from(channels).where(eq(channels.provider, provider))
+  if (channelRow.length === 0 || channelRow[0]!.status !== "connected") {
+    response.status(400).json({ error: `Channel ${provider} is not connected.` })
+    return
+  }
+
+  try {
+    await deliverMissionToChannel(db, {
+      provider,
+      title: "[Argus test] Sample mission ready for review",
+      summary: [
+        "This is a test delivery from Argus — no action required.",
+        "",
+        "When enabled, the mission engine surfaces candidate missions from your recent events and posts a short summary to this channel so you can react quickly.",
+      ].join("\n"),
+      link: "https://github.com/homanp/argus",
+    })
+    response.json({ ok: true, provider })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    response.status(500).json({ error: message })
+  }
 })
 
 app.get("/api/mission-suppressions", async (request, response) => {

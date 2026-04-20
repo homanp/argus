@@ -44,6 +44,19 @@ type StructuredAgentResult = {
   buttons?: ChannelButton[]
 }
 
+/**
+ * Normalized shape both trigger notifications and mission notifications are
+ * reduced to before they hit the per-provider senders. Keeps the Slack/Telegram/
+ * WhatsApp/Email request-building code agnostic of the upstream payload type.
+ */
+type ChannelPayload = {
+  title: string
+  summary: string
+  contextLines?: string[]
+  buttons?: ChannelButton[]
+  emailSubject: string
+}
+
 // Slack caps an actions block at 5 elements and a button label at ~75 chars.
 // We clamp a bit tighter for safety and to keep messages visually tidy.
 const MAX_BUTTONS = 5
@@ -130,7 +143,7 @@ function extractPrimaryTitle(payload: Record<string, unknown>) {
   return null
 }
 
-function buildFallbackTitle(notification: DeliveryNotification) {
+function buildFallbackTriggerTitle(notification: DeliveryNotification) {
   const itemTitle = extractPrimaryTitle(notification.payload)
   if (itemTitle) {
     return `${notification.trigger.name}: ${itemTitle}`
@@ -139,38 +152,52 @@ function buildFallbackTitle(notification: DeliveryNotification) {
   return `Argus trigger: ${notification.trigger.name}`
 }
 
-function buildFallbackSummary(notification: DeliveryNotification) {
+function buildFallbackTriggerSummary(notification: DeliveryNotification) {
   return `Argus processed this ${notification.sourceProvider}/${notification.eventType} event. Open Argus for the full review and history.`
 }
 
-function buildPlainText(notification: DeliveryNotification) {
-  const parts: string[] = [notification.channelTitle?.trim() || buildFallbackTitle(notification)]
-  const summary = notification.channelSummary?.trim() || buildFallbackSummary(notification)
-  parts.push("", summary)
+function buildTriggerPayload(notification: DeliveryNotification): ChannelPayload {
+  const title = notification.channelTitle?.trim() || buildFallbackTriggerTitle(notification)
+  const summary = notification.channelSummary?.trim() || buildFallbackTriggerSummary(notification)
 
-  const metadata: string[] = []
+  const contextLines: string[] = []
   if (notification.actionNeeded !== undefined && notification.actionNeeded !== null) {
-    metadata.push(`Action needed: ${notification.actionNeeded ? "Yes" : "No"}`)
+    contextLines.push(`Action needed: ${notification.actionNeeded ? "Yes" : "No"}`)
   }
   if (notification.commentNeeded !== undefined && notification.commentNeeded !== null) {
-    metadata.push(`GitHub comment: ${notification.commentNeeded ? "Needed" : "None"}`)
+    contextLines.push(`GitHub comment: ${notification.commentNeeded ? "Needed" : "None"}`)
   }
-  metadata.push(`Source: ${notification.sourceProvider}/${notification.eventType}`)
+  contextLines.push(`Source: ${notification.sourceProvider}/${notification.eventType}`)
 
-  const link = extractPrimaryLink(notification.payload)
-  if (link) {
-    metadata.push(`Link: ${link}`)
+  // Merge agent-emitted buttons with a default "View source" link so there is
+  // always a useful jump-off point even when the agent omits them.
+  const buttons: ChannelButton[] = [...(notification.buttons ?? [])]
+  const primaryLink = extractPrimaryLink(notification.payload)
+  const hasSourceLink = buttons.some((b) => primaryLink && b.url === primaryLink)
+  if (primaryLink && !hasSourceLink && buttons.length < MAX_BUTTONS) {
+    buttons.push({ label: "View source", url: primaryLink })
   }
 
-  if (metadata.length > 0) {
-    parts.push("", ...metadata)
+  return {
+    title,
+    summary,
+    contextLines,
+    buttons: buttons.length > 0 ? buttons : undefined,
+    emailSubject: `Argus: ${notification.trigger.name}`,
   }
-
-  return parts.join("\n")
 }
 
-function buildEmailSubject(notification: DeliveryNotification) {
-  return `Argus: ${notification.trigger.name}`
+function buildPlainText(payload: ChannelPayload) {
+  const parts: string[] = [payload.title, "", payload.summary]
+  if (payload.contextLines && payload.contextLines.length > 0) {
+    parts.push("", ...payload.contextLines)
+  }
+  if (payload.buttons && payload.buttons.length > 0) {
+    for (const button of payload.buttons) {
+      parts.push(`${button.label}: ${button.url}`)
+    }
+  }
+  return parts.join("\n")
 }
 
 function parseConfig<T>(row: ChannelRow): T | null {
@@ -197,49 +224,39 @@ type SlackBlock =
     }
   | { type: "divider" }
 
-function buildSlackBlocks(notification: DeliveryNotification): SlackBlock[] {
+function buildSlackBlocks(payload: ChannelPayload): SlackBlock[] {
   const blocks: SlackBlock[] = []
 
-  const title = notification.channelTitle?.trim() || buildFallbackTitle(notification)
   blocks.push({
     type: "header",
-    text: { type: "plain_text", text: title.slice(0, 150), emoji: true },
+    text: { type: "plain_text", text: payload.title.slice(0, 150), emoji: true },
   })
 
-  const summary = notification.channelSummary?.trim() || buildFallbackSummary(notification)
   blocks.push({
     type: "section",
-    text: { type: "mrkdwn", text: summary.slice(0, 2900) },
+    text: { type: "mrkdwn", text: payload.summary.slice(0, 2900) },
   })
 
-  const context: string[] = []
-  if (notification.actionNeeded !== undefined && notification.actionNeeded !== null) {
-    context.push(`*Action needed:* ${notification.actionNeeded ? "Yes" : "No"}`)
-  }
-  if (notification.commentNeeded !== undefined && notification.commentNeeded !== null) {
-    context.push(`*GitHub comment:* ${notification.commentNeeded ? "Needed" : "None"}`)
-  }
-  context.push(`*Source:* \`${notification.sourceProvider}/${notification.eventType}\``)
-  if (context.length > 0) {
+  if (payload.contextLines && payload.contextLines.length > 0) {
+    const formatted = payload.contextLines
+      .map((line) => {
+        const idx = line.indexOf(":")
+        if (idx <= 0) return line
+        const label = line.slice(0, idx).trim()
+        const rest = line.slice(idx + 1).trim()
+        return `*${label}:* ${rest}`
+      })
+      .join("  ·  ")
     blocks.push({
       type: "context",
-      elements: [{ type: "mrkdwn", text: context.join("  ·  ") }],
+      elements: [{ type: "mrkdwn", text: formatted }],
     })
   }
 
-  // Buttons: merge agent-emitted buttons with a default "View source" link so
-  // there is always a useful jump-off point even when the agent omits them.
-  const buttons = [...(notification.buttons ?? [])]
-  const primaryLink = extractPrimaryLink(notification.payload)
-  const hasSourceLink = buttons.some((b) => primaryLink && b.url === primaryLink)
-  if (primaryLink && !hasSourceLink && buttons.length < MAX_BUTTONS) {
-    buttons.push({ label: "View source", url: primaryLink })
-  }
-
-  if (buttons.length > 0) {
+  if (payload.buttons && payload.buttons.length > 0) {
     blocks.push({
       type: "actions",
-      elements: buttons.map((button) => ({
+      elements: payload.buttons.map((button) => ({
         type: "button" as const,
         text: { type: "plain_text" as const, text: button.label, emoji: true },
         url: button.url,
@@ -251,7 +268,7 @@ function buildSlackBlocks(notification: DeliveryNotification): SlackBlock[] {
   return blocks
 }
 
-async function postSlack(notification: DeliveryNotification, row: ChannelRow): Promise<DeliveryResult> {
+async function postSlack(payload: ChannelPayload, row: ChannelRow): Promise<DeliveryResult> {
   const config = parseConfig<{ botToken?: string; channelId?: string }>(row)
   if (!config?.botToken || !config.channelId) {
     throw new Error("Slack channel is missing bot token or channel ID.")
@@ -267,8 +284,8 @@ async function postSlack(notification: DeliveryNotification, row: ChannelRow): P
       channel: config.channelId,
       // `text` is used as the notification/push preview and as a fallback for
       // clients that can't render blocks. Blocks carry the rich layout.
-      text: buildPlainText(notification),
-      blocks: buildSlackBlocks(notification),
+      text: buildPlainText(payload),
+      blocks: buildSlackBlocks(payload),
     }),
   })
 
@@ -284,7 +301,7 @@ async function postSlack(notification: DeliveryNotification, row: ChannelRow): P
   }
 }
 
-async function postTelegram(notification: DeliveryNotification, row: ChannelRow): Promise<DeliveryResult> {
+async function postTelegram(payload: ChannelPayload, row: ChannelRow): Promise<DeliveryResult> {
   const config = parseConfig<{ botToken?: string; chatId?: string }>(row)
   if (!config?.botToken || !config.chatId) {
     throw new Error("Telegram channel is missing bot token or chat ID.")
@@ -297,7 +314,7 @@ async function postTelegram(notification: DeliveryNotification, row: ChannelRow)
     },
     body: JSON.stringify({
       chat_id: config.chatId,
-      text: buildPlainText(notification),
+      text: buildPlainText(payload),
     }),
   })
 
@@ -313,7 +330,7 @@ async function postTelegram(notification: DeliveryNotification, row: ChannelRow)
   }
 }
 
-async function postWhatsApp(notification: DeliveryNotification, row: ChannelRow): Promise<DeliveryResult> {
+async function postWhatsApp(payload: ChannelPayload, row: ChannelRow): Promise<DeliveryResult> {
   const config = parseConfig<{ accessToken?: string; phoneNumberId?: string; recipient?: string }>(row)
   if (!config?.accessToken || !config.phoneNumberId || !config.recipient) {
     throw new Error("WhatsApp channel is missing access token, phone number ID, or recipient.")
@@ -330,7 +347,7 @@ async function postWhatsApp(notification: DeliveryNotification, row: ChannelRow)
       to: config.recipient,
       type: "text",
       text: {
-        body: buildPlainText(notification),
+        body: buildPlainText(payload),
       },
     }),
   })
@@ -347,7 +364,7 @@ async function postWhatsApp(notification: DeliveryNotification, row: ChannelRow)
   }
 }
 
-async function postEmail(notification: DeliveryNotification, row: ChannelRow): Promise<DeliveryResult> {
+async function postEmail(payload: ChannelPayload, row: ChannelRow): Promise<DeliveryResult> {
   const config = parseConfig<{ apiKey?: string; fromEmail?: string; toEmail?: string }>(row)
   if (!config?.apiKey || !config.fromEmail || !config.toEmail) {
     throw new Error("Email channel is missing Resend API key, from email, or to email.")
@@ -362,8 +379,8 @@ async function postEmail(notification: DeliveryNotification, row: ChannelRow): P
     body: JSON.stringify({
       from: config.fromEmail,
       to: [config.toEmail],
-      subject: buildEmailSubject(notification),
-      text: buildPlainText(notification),
+      subject: payload.emailSubject,
+      text: buildPlainText(payload),
     }),
   })
 
@@ -379,16 +396,16 @@ async function postEmail(notification: DeliveryNotification, row: ChannelRow): P
   }
 }
 
-async function deliverToChannel(notification: DeliveryNotification, row: ChannelRow) {
+async function deliverToChannel(payload: ChannelPayload, row: ChannelRow) {
   switch (row.provider) {
     case "slack":
-      return postSlack(notification, row)
+      return postSlack(payload, row)
     case "telegram":
-      return postTelegram(notification, row)
+      return postTelegram(payload, row)
     case "whatsapp":
-      return postWhatsApp(notification, row)
+      return postWhatsApp(payload, row)
     case "email":
-      return postEmail(notification, row)
+      return postEmail(payload, row)
     default:
       throw new Error(`Unsupported channel provider: ${row.provider}`)
   }
@@ -451,9 +468,11 @@ async function deliverNotification(
   const rows = await db.select().from(schema.channels)
   const selected = rows.filter((row) => targets.includes(row.provider) && row.status === "connected")
 
+  const payload = buildTriggerPayload(notification)
+
   for (const row of selected) {
     try {
-      const result = await deliverToChannel(notification, row)
+      const result = await deliverToChannel(payload, row)
       await recordAttempt(db, triggerExecutionId, row, "delivered", createdAt, result, null)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -466,5 +485,43 @@ async function deliverNotification(
   }
 }
 
-export { deliverNotification, parseStructuredAgentResult }
+type MissionChannelInput = {
+  provider: string
+  title: string
+  summary: string
+  link?: string | null
+}
+
+async function deliverMissionToChannel(db: DB, input: MissionChannelInput) {
+  const rows = await db.select().from(schema.channels)
+  const row = rows.find((r) => r.provider === input.provider && r.status === "connected")
+  if (!row) return
+
+  const buttons: ChannelButton[] = []
+  if (input.link && /^https?:\/\//i.test(input.link)) {
+    buttons.push({ label: "View source", url: input.link })
+  }
+
+  const payload: ChannelPayload = {
+    title: input.title,
+    summary: input.summary,
+    contextLines: ["Source: Argus mission"],
+    buttons: buttons.length > 0 ? buttons : undefined,
+    emailSubject: `Argus mission: ${input.title}`,
+  }
+
+  const createdAt = new Date().toISOString()
+  try {
+    await deliverToChannel(payload, row)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await db
+      .update(schema.channels)
+      .set({ lastError: message.slice(0, 4000), updatedAt: createdAt })
+      .where(eq(schema.channels.id, row.id))
+    throw error
+  }
+}
+
+export { deliverMissionToChannel, deliverNotification, parseStructuredAgentResult }
 export type { ChannelButton, DeliveryNotification, StructuredAgentResult }
