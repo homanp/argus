@@ -11,7 +11,6 @@ import {
   Github01Icon,
   Mail01Icon,
   Notification03Icon,
-  Pulse02Icon,
   SlackIcon,
   StripeIcon,
   Task01Icon,
@@ -38,14 +37,9 @@ const primaryNavigation: NavigationItem[] = [
     highlighted: true,
   },
   {
-    title: "Pulse",
-    icon: Pulse02Icon,
-    count: "3",
-  },
-  {
     title: "Activity",
     icon: Task01Icon,
-    count: "247",
+    href: "/activity",
   },
   {
     title: "Insights",

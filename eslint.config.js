@@ -6,7 +6,10 @@ import tseslint from "typescript-eslint"
 import { defineConfig, globalIgnores } from "eslint/config"
 
 export default defineConfig([
-  globalIgnores(["dist"]),
+  // Build artifacts from vite, cargo (tauri + cli), and relay TS — none of
+  // these are hand-authored and at least one (tauri-codegen-assets *.js)
+  // isn't valid ES parser input.
+  globalIgnores(["dist", "src-tauri/target", "cli/target", "relay/dist"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
@@ -30,7 +33,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/router.tsx"],
+    files: ["src/router.tsx", "src/components/activity-row.tsx"],
     rules: {
       "react-refresh/only-export-components": "off",
     },

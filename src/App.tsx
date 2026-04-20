@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useState } from "react"
-import { Loading03Icon } from "@hugeicons/core-free-icons"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { ActivitySparkIcon, Loading03Icon } from "@hugeicons/core-free-icons"
+import { useNavigate } from "@tanstack/react-router"
 
-import { MissionCard } from "@/components/decision-card"
+import { ActivityRowItem, groupRowsByStatus, type ActivityRow } from "@/components/activity-row"
 import { HugeIcon } from "@/components/ui/huge-icon"
-import { getAgent, getMissions } from "@/lib/relay-api"
-import type { AgentConfig, MissionSummary } from "@/lib/relay-api"
+import { getMissions } from "@/lib/relay-api"
+import type { MissionSummary } from "@/lib/relay-api"
 import { useRelayEvent } from "@/lib/relay-events"
 
+// Missions home page. Uses the same Linear-style table as the Activity view
+// but restricted to mission rows. Clicking a row navigates straight to the
+// mission detail page where the user can approve/dismiss/decide.
+
 function App() {
+  const navigate = useNavigate()
   const [missions, setMissions] = useState<MissionSummary[] | null>(null)
-  const [agent, setAgent] = useState<AgentConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(() => {
@@ -31,23 +36,24 @@ function App() {
   // a `missions` event on create/update/delete/scan/execution state change.
   useRelayEvent("missions", reload)
 
-  useEffect(() => {
-    let cancelled = false
-    getAgent()
-      .then((result) => {
-        if (!cancelled) setAgent(result)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const rows = useMemo<ActivityRow[]>(
+    () =>
+      (missions ?? []).map((mission) => ({
+        kind: "mission",
+        id: `mission-${mission.id}`,
+        at: mission.createdAt,
+        data: mission,
+      })),
+    [missions],
+  )
 
-  const awaiting = (missions ?? []).filter((mission) => mission.status === "awaiting_decision")
+  // Grouping mirrors the Activity view: awaiting_decision first (lives in
+  // the "awaiting" lane), then decided (completed), then dismissed.
+  const grouped = useMemo(() => groupRowsByStatus(rows), [rows])
 
   if (missions === null && !error) {
     return (
-      <section className="px-6 py-5 md:px-8">
+      <section className="px-6 pt-1 pb-5 md:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 py-16 text-[13px] text-white/40">
           <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
           Loading missions...
@@ -57,7 +63,7 @@ function App() {
   }
 
   return (
-    <section className="px-6 py-5 md:px-8">
+    <section className="px-6 pt-1 pb-5 md:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
         {error && (
           <div className="rounded-md border border-rose-300/20 bg-rose-300/[0.06] px-4 py-3 text-[13px] text-rose-100/85">
@@ -65,19 +71,35 @@ function App() {
           </div>
         )}
 
-        {awaiting.length === 0 && !error && (
-          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-6 text-center text-sm text-white/45">
-            No missions waiting. Argus is watching.
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">
+              <HugeIcon icon={ActivitySparkIcon} size={22} />
+            </div>
+            <div className="space-y-1 text-center">
+              <p className="text-[13px] font-medium text-white/70">No missions yet</p>
+              <p className="text-[13px] text-white/40">
+                Argus is watching. Missions appear here when the engine surfaces decisions worth your attention.
+              </p>
+            </div>
           </div>
-        )}
-
-        {awaiting.map((mission) => (
-          <MissionCard key={mission.id} mission={mission} agentName={agent?.name ?? null} onDecided={reload} />
-        ))}
-
-        {awaiting.length > 0 && (
-          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-6 text-center text-sm text-white/45">
-            That's everything. Argus handled the rest.
+        ) : (
+          <div className="flex flex-col">
+            {grouped.map((group) => (
+              <Fragment key={group.id}>
+                {group.rows.map((row) => (
+                  <ActivityRowItem
+                    key={row.id}
+                    row={row}
+                    onSelect={() =>
+                      row.kind === "mission"
+                        ? navigate({ to: "/missions/$missionId", params: { missionId: row.data.id } })
+                        : undefined
+                    }
+                  />
+                ))}
+              </Fragment>
+            ))}
           </div>
         )}
       </div>

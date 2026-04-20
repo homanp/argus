@@ -16,6 +16,7 @@ import {
   ConnectIcon,
   Notification03Icon,
   Search01Icon,
+  Task01Icon,
   ZapIcon,
 } from "@hugeicons/core-free-icons"
 
@@ -32,6 +33,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { missionsHeader } from "@/lib/app-shell-data"
 import { channelCatalog } from "@/lib/channel-catalog"
 import { integrationCatalog } from "@/lib/integration-catalog"
+import ActivityPage from "@/pages/activity-page"
 import ChannelDetailPage from "@/pages/channel-detail-page"
 import ChannelsPage from "@/pages/channels-page"
 import InsightsPage from "@/pages/insights-page"
@@ -73,6 +75,11 @@ const routeHeaderMap = {
     title: "Agent",
     subtitle: "Configure the local CLI agent for triggers and schedules",
     icon: AiBrain02Icon,
+  },
+  "/activity": {
+    title: "Activity",
+    subtitle: "Every session Argus has run and every mission it has created",
+    icon: Task01Icon,
   },
   "/insights": {
     title: "Insights",
@@ -522,6 +529,12 @@ const insightsRoute = createRoute({
   component: InsightsPage,
 })
 
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: ActivityPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   connectorsRoute,
@@ -534,6 +547,7 @@ const routeTree = rootRoute.addChildren([
   scheduleDetailRoute,
   missionDetailRoute,
   insightsRoute,
+  activityRoute,
   agentsRoute,
 ])
 

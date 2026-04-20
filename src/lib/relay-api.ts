@@ -520,8 +520,9 @@ type ValidateResult = {
   checkedAt: string
 }
 
-async function getRecentSessions() {
-  return request<RecentSession[]>("/api/sessions/recent")
+async function getRecentSessions(options: { limit?: number } = {}) {
+  const query = options.limit ? `?limit=${options.limit}` : ""
+  return request<RecentSession[]>(`/api/sessions/recent${query}`)
 }
 
 async function getMissions() {

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChartUpIcon, Loading03Icon, PencilEdit02Icon, RefreshIcon, SparklesIcon } from "@hugeicons/core-free-icons"
+import {
+  ChartUpIcon,
+  Loading03Icon,
+  PencilEdit02Icon,
+  SearchVisualIcon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -125,7 +131,7 @@ function OperatingDocEditor({ doc, onSaved }: { doc: OperatingDoc; onSaved: (nex
           className="h-[320px] w-full resize-y rounded-lg border border-white/10 bg-black/20 p-4 font-mono text-[12px] leading-relaxed text-white/80 focus:border-violet-300/40 focus:outline-none"
         />
       ) : (
-        <div className="rounded-lg border border-white/8 bg-white/[0.02] p-5 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-3 [&_h1]:text-[16px] [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[14px] [&_h2]:font-semibold [&_h2]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
+        <div className="rounded-lg border border-white/8 bg-white/[0.02] p-5 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-3 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[12px] [&_h2]:font-semibold [&_h2]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.markdown || "_empty_"}</ReactMarkdown>
         </div>
       )}
@@ -159,7 +165,7 @@ function ScanSummaryCard({
           {scanning ? (
             <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
           ) : (
-            <HugeIcon icon={RefreshIcon} size={12} />
+            <HugeIcon icon={SearchVisualIcon} size={12} />
           )}
           Scan now
         </Button>
@@ -211,7 +217,12 @@ function Stat({ label, value, highlight }: { label: string; value: number; highl
   return (
     <div className="rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
       <p className="text-[11px] text-white/40">{label}</p>
-      <p className={cn("text-[18px] leading-snug font-semibold", highlight ? "text-violet-200" : "text-white/85")}>
+      <p
+        className={cn(
+          "text-[13px] leading-snug font-semibold tabular-nums",
+          highlight ? "text-violet-200" : "text-white/85",
+        )}
+      >
         {value}
       </p>
     </div>

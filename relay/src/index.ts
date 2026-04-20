@@ -2451,7 +2451,16 @@ app.post("/api/operating-doc/updates/:updateId/revert", async (request, response
 
 // ── Sessions (unified recent executions) ──
 
-app.get("/api/sessions/recent", async (_request, response) => {
+app.get("/api/sessions/recent", async (request, response) => {
+  // The sidebar only asks for ~20 entries; the Activity page asks for up to
+  // a few hundred. We clamp to avoid unbounded scans since this endpoint is
+  // called on every SSE tick across open clients.
+  const requested = Number.parseInt(String(request.query.limit ?? ""), 10)
+  const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 500) : 20
+  // Each per-source query pulls up to `limit` rows so the merged view can
+  // still surface `limit` newest entries even if one source dominates.
+  const perSourceLimit = limit
+
   const triggerRows = db
     .select({
       id: triggerExecutions.id,
@@ -2465,7 +2474,7 @@ app.get("/api/sessions/recent", async (_request, response) => {
     .from(triggerExecutions)
     .leftJoin(triggers, eq(triggerExecutions.triggerId, triggers.id))
     .orderBy(desc(triggerExecutions.matchedAt))
-    .limit(20)
+    .limit(perSourceLimit)
     .all()
 
   const scheduleRows = db
@@ -2481,7 +2490,7 @@ app.get("/api/sessions/recent", async (_request, response) => {
     .from(scheduleExecutions)
     .leftJoin(schedules, eq(scheduleExecutions.scheduleId, schedules.id))
     .orderBy(desc(scheduleExecutions.startedAt))
-    .limit(20)
+    .limit(perSourceLimit)
     .all()
 
   const missionExecRows = db
@@ -2497,7 +2506,7 @@ app.get("/api/sessions/recent", async (_request, response) => {
     .from(missionExecutions)
     .leftJoin(missions, eq(missionExecutions.missionId, missions.id))
     .orderBy(desc(missionExecutions.startedAt))
-    .limit(20)
+    .limit(perSourceLimit)
     .all()
 
   const combined = [
@@ -2533,7 +2542,7 @@ app.get("/api/sessions/recent", async (_request, response) => {
     })),
   ]
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-    .slice(0, 20)
+    .slice(0, limit)
 
   response.json(combined)
 })
