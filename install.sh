@@ -20,6 +20,9 @@
 #   ARGUS_SRC_DIR   clone destination when building from source
 #                   (default: $HOME/.argus/src)
 #   ARGUS_REPO      GitHub repo in owner/name form (default: homanp/argus)
+#   ARGUS_NO_MODIFY_PATH
+#                   set to 1 to skip editing shell rc files (the installer will
+#                   just print the export line to add manually)
 
 set -eu
 
@@ -27,6 +30,7 @@ REPO="${ARGUS_REPO:-homanp/argus}"
 BIN_DIR="${ARGUS_BIN_DIR:-$HOME/.argus/bin}"
 SRC_DIR="${ARGUS_SRC_DIR:-$HOME/.argus/src}"
 REF="${ARGUS_REF:-main}"
+NO_MODIFY_PATH="${ARGUS_NO_MODIFY_PATH:-0}"
 
 die() {
   printf 'argus install: %s\n' "$1" >&2
@@ -162,6 +166,69 @@ install_from_source() {
   chmod +x "$BIN_DIR/argus"
 }
 
+# ── Shell PATH wiring ───────────────────────────────────────────────────────
+#
+# Append the BIN_DIR export to the user's shell rc files, guarded by a marker
+# so subsequent runs are idempotent. Mirrors the UX of rustup / uv / bun.
+
+ARGUS_PATH_MARKER="# added by argus installer"
+
+append_path_line_posix() {
+  # $1 = rc file path
+  rc="$1"
+  [ -n "$rc" ] || return 0
+
+  mkdir -p "$(dirname "$rc")"
+  [ -f "$rc" ] || : > "$rc"
+
+  if grep -Fq "$ARGUS_PATH_MARKER" "$rc" 2>/dev/null; then
+    return 0
+  fi
+
+  {
+    printf '\n%s\n' "$ARGUS_PATH_MARKER"
+    printf 'export PATH="%s:$PATH"\n' "$BIN_DIR"
+  } >> "$rc"
+
+  MODIFIED_RCS="${MODIFIED_RCS:-}${MODIFIED_RCS:+ }$rc"
+}
+
+append_path_line_fish() {
+  rc="$1"
+  [ -n "$rc" ] || return 0
+
+  mkdir -p "$(dirname "$rc")"
+  [ -f "$rc" ] || : > "$rc"
+
+  if grep -Fq "$ARGUS_PATH_MARKER" "$rc" 2>/dev/null; then
+    return 0
+  fi
+
+  {
+    printf '\n%s\n' "$ARGUS_PATH_MARKER"
+    printf 'set -gx PATH "%s" $PATH\n' "$BIN_DIR"
+  } >> "$rc"
+
+  MODIFIED_RCS="${MODIFIED_RCS:-}${MODIFIED_RCS:+ }$rc"
+}
+
+wire_shell_path() {
+  MODIFIED_RCS=""
+
+  # zsh: login + interactive
+  append_path_line_posix "$HOME/.zshenv"
+
+  # bash: login shells (macOS Terminal) + interactive (Linux default)
+  append_path_line_posix "$HOME/.bash_profile"
+  append_path_line_posix "$HOME/.bashrc"
+
+  # generic POSIX fallback
+  append_path_line_posix "$HOME/.profile"
+
+  # fish
+  append_path_line_fish "$HOME/.config/fish/config.fish"
+}
+
 # ── Dispatch ────────────────────────────────────────────────────────────────
 
 if [ -n "${ARGUS_VERSION:-}" ] || [ "${ARGUS_RELEASE:-}" = "1" ]; then
@@ -178,8 +245,23 @@ case ":$PATH:" in
     printf '\nargus is on your PATH. Run `argus doctor` to verify your relay is reachable.\n'
     ;;
   *)
-    printf '\nAdd %s to your PATH to use argus from anywhere:\n' "$BIN_DIR"
-    printf '\n  export PATH="%s:$PATH"\n\n' "$BIN_DIR"
-    printf 'Append that line to ~/.bashrc, ~/.zshrc, ~/.profile, or your shell rc of choice.\n'
+    if [ "$NO_MODIFY_PATH" = "1" ]; then
+      printf '\nAdd %s to your PATH to use argus from anywhere:\n' "$BIN_DIR"
+      printf '\n  export PATH="%s:$PATH"\n\n' "$BIN_DIR"
+      printf 'Append that line to ~/.bashrc, ~/.zshrc, ~/.profile, or your shell rc of choice.\n'
+    else
+      wire_shell_path
+      if [ -n "${MODIFIED_RCS:-}" ]; then
+        printf '\nAdded %s to PATH in:\n' "$BIN_DIR"
+        for rc in $MODIFIED_RCS; do
+          printf '  - %s\n' "$rc"
+        done
+        printf '\nOpen a new terminal (or `source` the file above) and run `argus doctor`.\n'
+        printf 'For the current shell only:\n\n  export PATH="%s:$PATH"\n' "$BIN_DIR"
+      else
+        printf '\nargus binary installed. Run `argus doctor` to verify your relay is reachable.\n'
+        printf '(PATH entry was already present in your shell rc.)\n'
+      fi
+    fi
     ;;
 esac

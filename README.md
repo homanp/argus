@@ -221,7 +221,7 @@ while no CLI release has been cut yet, install `install.sh` directly from the `m
 curl -fsSL https://raw.githubusercontent.com/homanp/argus/main/install.sh | bash
 ```
 
-pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and prints the `export PATH=…` line to add to your shell rc.
+pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and appends that directory to your `PATH` in `~/.zshenv`, `~/.bashrc`, `~/.bash_profile`, `~/.profile`, and `~/.config/fish/config.fish` (whichever apply). open a new terminal — or run `source ~/.zshenv` (zsh) / `source ~/.bashrc` (bash) — and `argus` will be on your `PATH`. pass `ARGUS_NO_MODIFY_PATH=1` to skip the shell-rc edits.
 
 v1 commands:
 
