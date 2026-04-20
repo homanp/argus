@@ -221,7 +221,7 @@ while no CLI release has been cut yet, install `install.sh` directly from the `m
 curl -fsSL https://raw.githubusercontent.com/homanp/argus/main/install.sh | bash
 ```
 
-pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and prints the `export PATH=…` line to add to your shell rc.
+pin a specific version with `ARGUS_VERSION=cli-v0.1.0 curl -fsSL … | bash`. the installer drops the `argus` binary into `~/.argus/bin` and appends that directory to your `PATH` in whichever shell rc files actually apply to you — detected from `$SHELL` and existing rc files, so bash-only users don't get a spurious `~/.zshenv`, zsh-only users don't get `~/.bashrc`, and nobody gets a surprise `~/.config/fish/config.fish` unless they use fish. for the bash login rc it prefers your existing `~/.bash_profile` → `~/.bash_login` → `~/.profile` (never creating `~/.bash_profile` when `~/.profile` exists, which would shadow it). open a new terminal — or `source` the modified rc — and `argus` will be on your `PATH`. pass `ARGUS_NO_MODIFY_PATH=1` to skip the shell-rc edits entirely.
 
 v1 commands:
 

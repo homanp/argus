@@ -20,6 +20,9 @@
 #   ARGUS_SRC_DIR   clone destination when building from source
 #                   (default: $HOME/.argus/src)
 #   ARGUS_REPO      GitHub repo in owner/name form (default: homanp/argus)
+#   ARGUS_NO_MODIFY_PATH
+#                   set to 1 to skip editing shell rc files (the installer will
+#                   just print the export line to add manually)
 
 set -eu
 
@@ -27,6 +30,7 @@ REPO="${ARGUS_REPO:-homanp/argus}"
 BIN_DIR="${ARGUS_BIN_DIR:-$HOME/.argus/bin}"
 SRC_DIR="${ARGUS_SRC_DIR:-$HOME/.argus/src}"
 REF="${ARGUS_REF:-main}"
+NO_MODIFY_PATH="${ARGUS_NO_MODIFY_PATH:-0}"
 
 die() {
   printf 'argus install: %s\n' "$1" >&2
@@ -162,6 +166,127 @@ install_from_source() {
   chmod +x "$BIN_DIR/argus"
 }
 
+# ── Shell PATH wiring ───────────────────────────────────────────────────────
+#
+# Append the BIN_DIR export to the user's shell rc files, guarded by a marker
+# so subsequent runs are idempotent. Mirrors the UX of rustup / uv / bun.
+
+ARGUS_PATH_MARKER="# added by argus installer"
+
+append_path_line_posix() {
+  # $1 = rc file path
+  rc="$1"
+  [ -n "$rc" ] || return 0
+
+  mkdir -p "$(dirname "$rc")"
+  [ -f "$rc" ] || : > "$rc"
+
+  if grep -Fq "$ARGUS_PATH_MARKER" "$rc" 2>/dev/null; then
+    return 0
+  fi
+
+  {
+    printf '\n%s\n' "$ARGUS_PATH_MARKER"
+    printf 'export PATH="%s:$PATH"\n' "$BIN_DIR"
+  } >> "$rc"
+
+  MODIFIED_RCS="${MODIFIED_RCS:-}${MODIFIED_RCS:+ }$rc"
+}
+
+append_path_line_fish() {
+  rc="$1"
+  [ -n "$rc" ] || return 0
+
+  mkdir -p "$(dirname "$rc")"
+  [ -f "$rc" ] || : > "$rc"
+
+  if grep -Fq "$ARGUS_PATH_MARKER" "$rc" 2>/dev/null; then
+    return 0
+  fi
+
+  {
+    printf '\n%s\n' "$ARGUS_PATH_MARKER"
+    printf 'set -gx PATH "%s" $PATH\n' "$BIN_DIR"
+  } >> "$rc"
+
+  MODIFIED_RCS="${MODIFIED_RCS:-}${MODIFIED_RCS:+ }$rc"
+}
+
+pick_bash_login_rc() {
+  # Bash login shells read the FIRST existing file from this ordered list:
+  #   ~/.bash_profile, ~/.bash_login, ~/.profile
+  # and silently skip the rest. So we must only append to a file that is
+  # already in play — creating ~/.bash_profile when the user only has
+  # ~/.profile would shadow .profile on every login and break their env.
+  #
+  # Strategy: prefer whichever login rc already exists; fall back to
+  # creating ~/.profile (the most portable POSIX login rc — sh, dash, and
+  # bash all honor it).
+  if [ -f "$HOME/.bash_profile" ]; then
+    printf '%s\n' "$HOME/.bash_profile"
+  elif [ -f "$HOME/.bash_login" ]; then
+    printf '%s\n' "$HOME/.bash_login"
+  else
+    printf '%s\n' "$HOME/.profile"
+  fi
+}
+
+current_shell_is() {
+  # $1 = shell name (e.g. zsh, bash, fish, dash, sh)
+  case "${SHELL:-}" in
+    */"$1"|"$1") return 0 ;;
+  esac
+  return 1
+}
+
+wire_shell_path() {
+  MODIFIED_RCS=""
+
+  # We only wire a shell's rc if that shell is in use — either it's the
+  # user's current $SHELL, or a matching rc file already exists. This
+  # avoids leaving spurious ~/.zshenv / ~/.config/fish/config.fish files
+  # on systems where the user doesn't actually use those shells.
+
+  # zsh: ~/.zshenv is sourced for every zsh invocation (login, interactive,
+  # non-interactive). Safe to create, but only if zsh is actually used.
+  if current_shell_is zsh \
+     || [ -f "$HOME/.zshenv" ] \
+     || [ -f "$HOME/.zshrc" ] \
+     || [ -f "$HOME/.zprofile" ]; then
+    append_path_line_posix "$HOME/.zshenv"
+  fi
+
+  # bash interactive non-login (Linux default): standalone file, no
+  # fallback chain to worry about, safe to create when bash is in use.
+  if current_shell_is bash || [ -f "$HOME/.bashrc" ]; then
+    append_path_line_posix "$HOME/.bashrc"
+  fi
+
+  # bash / sh / dash login shells: append to whichever login rc is
+  # already in use, falling back to ~/.profile. Never create
+  # ~/.bash_profile when ~/.profile exists — see pick_bash_login_rc.
+  if current_shell_is bash || current_shell_is sh || current_shell_is dash \
+     || [ -f "$HOME/.bash_profile" ] \
+     || [ -f "$HOME/.bash_login" ] \
+     || [ -f "$HOME/.profile" ]; then
+    append_path_line_posix "$(pick_bash_login_rc)"
+  fi
+
+  # fish: config.fish is always read by fish; safe to create when fish
+  # is in use.
+  if current_shell_is fish || [ -f "$HOME/.config/fish/config.fish" ]; then
+    append_path_line_fish "$HOME/.config/fish/config.fish"
+  fi
+
+  # Safety net: if we couldn't identify the user's shell from $SHELL and
+  # no matching rc existed, fall back to ~/.profile — the most portable
+  # POSIX login rc. This keeps the installer useful in minimal / exotic
+  # environments while avoiding the spurious-file behaviour above.
+  if [ -z "$MODIFIED_RCS" ] && ! grep -Fq "$ARGUS_PATH_MARKER" "$HOME/.profile" 2>/dev/null; then
+    append_path_line_posix "$HOME/.profile"
+  fi
+}
+
 # ── Dispatch ────────────────────────────────────────────────────────────────
 
 if [ -n "${ARGUS_VERSION:-}" ] || [ "${ARGUS_RELEASE:-}" = "1" ]; then
@@ -178,8 +303,23 @@ case ":$PATH:" in
     printf '\nargus is on your PATH. Run `argus doctor` to verify your relay is reachable.\n'
     ;;
   *)
-    printf '\nAdd %s to your PATH to use argus from anywhere:\n' "$BIN_DIR"
-    printf '\n  export PATH="%s:$PATH"\n\n' "$BIN_DIR"
-    printf 'Append that line to ~/.bashrc, ~/.zshrc, ~/.profile, or your shell rc of choice.\n'
+    if [ "$NO_MODIFY_PATH" = "1" ]; then
+      printf '\nAdd %s to your PATH to use argus from anywhere:\n' "$BIN_DIR"
+      printf '\n  export PATH="%s:$PATH"\n\n' "$BIN_DIR"
+      printf 'Append that line to ~/.bashrc, ~/.zshrc, ~/.profile, or your shell rc of choice.\n'
+    else
+      wire_shell_path
+      if [ -n "${MODIFIED_RCS:-}" ]; then
+        printf '\nAdded %s to PATH in:\n' "$BIN_DIR"
+        for rc in $MODIFIED_RCS; do
+          printf '  - %s\n' "$rc"
+        done
+        printf '\nOpen a new terminal (or `source` the file above) and run `argus doctor`.\n'
+        printf 'For the current shell only:\n\n  export PATH="%s:$PATH"\n' "$BIN_DIR"
+      else
+        printf '\nargus binary installed. Run `argus doctor` to verify your relay is reachable.\n'
+        printf '(PATH entry was already present in your shell rc.)\n'
+      fi
+    fi
     ;;
 esac
