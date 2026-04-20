@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { RouterProvider } from "@tanstack/react-router"
 
+import { StartupExperience } from "@/components/startup-experience"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
 import "./index.css"
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
     <div className="min-h-svh bg-background text-foreground">
       <TooltipProvider>
         <RouterProvider router={router} />
+        <StartupExperience />
       </TooltipProvider>
     </div>
   </StrictMode>,

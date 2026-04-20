@@ -157,7 +157,7 @@ function ScheduleDetailPage() {
 
   if (loading) {
     return (
-      <section className="px-5 py-5 md:px-6">
+      <section className="px-6 py-5 md:px-8">
         <div className="mx-auto flex max-w-3xl items-center justify-center gap-2 py-16 text-[13px] text-white/40">
           <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
           Loading schedule...
@@ -168,7 +168,7 @@ function ScheduleDetailPage() {
 
   if (error || !data) {
     return (
-      <section className="px-5 py-5 md:px-6">
+      <section className="px-6 py-5 md:px-8">
         <div className="mx-auto max-w-3xl">
           <p className="text-[13px] text-rose-200/85">{error ?? "Schedule not found."}</p>
         </div>
@@ -179,7 +179,7 @@ function ScheduleDetailPage() {
   const { schedule, executions } = data
 
   return (
-    <section className="px-5 py-5 md:px-6">
+    <section className="px-6 py-5 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <div className="overflow-hidden rounded-lg border border-white/8">
           <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">

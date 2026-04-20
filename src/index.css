@@ -107,7 +107,7 @@
   --chart-3: #71717a;
   --chart-4: #52525b;
   --chart-5: #27272a;
-  --sidebar: rgb(255 255 255 / 0.03);
+  --sidebar: rgb(10 10 14 / 0.82);
   --sidebar-foreground: #f7f7f8;
   --sidebar-primary: #c4b5fd;
   --sidebar-primary-foreground: #1a102f;
@@ -143,5 +143,100 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@keyframes argusBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+}
+
+@keyframes argusFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes argusStepEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes argusGlowA {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+}
+
+@keyframes argusGlowB {
+  0%,
+  100% {
+    transform: scale(1.05);
+    opacity: 0.46;
+  }
+  50% {
+    transform: scale(0.92);
+    opacity: 0.82;
+  }
+}
+
+@keyframes argusHalo {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.92;
+  }
+}
+
+@layer utilities {
+  .animate-argus-breathe {
+    animation: argusBreathe 5.8s ease-in-out infinite;
+  }
+
+  .animate-argus-glow-a {
+    animation: argusGlowA 14s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .animate-argus-glow-b {
+    animation: argusGlowB 18s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .animate-argus-halo {
+    animation: argusHalo 6.8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .animate-argus-fade-up {
+    animation: argusFadeIn 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity;
+  }
+
+  .animate-argus-step-enter {
+    animation: argusStepEnter 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity;
   }
 }

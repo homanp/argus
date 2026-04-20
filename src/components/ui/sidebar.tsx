@@ -146,7 +146,7 @@ function Sidebar({
         data-slot="sidebar-container"
         data-side={side}
         className={cn(
-          "fixed hidden w-(--sidebar-width) bg-sidebar md:flex",
+          "fixed hidden w-(--sidebar-width) bg-sidebar backdrop-blur-xl md:flex",
           variant === "floating" || variant === "inset"
             ? "inset-y-0 z-10 h-svh p-2 data-[side=left]:left-0 data-[side=right]:right-0"
             : "z-50 top-2 bottom-2 left-2 h-[calc(100svh-16px)] rounded-xl border border-white/[0.06]",

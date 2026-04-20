@@ -147,8 +147,8 @@ function RootLayout() {
       <div data-tauri-drag-region className="fixed inset-x-0 top-0 z-[5] h-8" />
       <SidebarProvider className="min-h-svh flex-1">
         <AppSidebar />
-        <SidebarInset className="flex h-svh flex-col overflow-hidden bg-transparent">
-          <header className="z-10 mt-2 flex h-11 shrink-0 items-center justify-between bg-transparent px-6 backdrop-blur-xl md:px-8">
+        <SidebarInset className="flex h-svh flex-col overflow-hidden bg-background">
+          <header className="z-10 flex h-11 shrink-0 items-center justify-between bg-transparent px-6 md:px-8">
             <div className="flex min-w-0 items-center gap-2">
               {providerTitle || isTriggersDetail || isSchedulesDetail || isMissionDetail ? (
                 <Link
