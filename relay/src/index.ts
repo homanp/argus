@@ -37,6 +37,7 @@ import { emitEvent, subscribeToEvents } from "./events.js"
 import {
   ensureMissionSettings,
   ensureOperatingDoc,
+  isMissionChannelProvider,
   recordDecision,
   revertOperatingDocUpdate,
   runMissionScan,
@@ -2291,8 +2292,6 @@ app.get("/api/mission-settings", async (_request, response) => {
   response.json(serializeMissionSettings(row))
 })
 
-const MISSION_CHANNEL_PROVIDER_VALUES = ["slack", "telegram", "whatsapp", "email"] as const
-
 app.put("/api/mission-settings", express.json(), async (request, response) => {
   const body = request.body ?? {}
   const patch: Parameters<typeof updateMissionSettings>[1] = {}
@@ -2307,8 +2306,8 @@ app.put("/api/mission-settings", express.json(), async (request, response) => {
     const raw = body.missionChannelProvider
     if (raw === null || raw === "") {
       patch.missionChannelProvider = null
-    } else if (typeof raw === "string" && (MISSION_CHANNEL_PROVIDER_VALUES as readonly string[]).includes(raw)) {
-      patch.missionChannelProvider = raw as (typeof MISSION_CHANNEL_PROVIDER_VALUES)[number]
+    } else if (isMissionChannelProvider(raw)) {
+      patch.missionChannelProvider = raw
     } else {
       response.status(400).json({ error: "Invalid missionChannelProvider." })
       return

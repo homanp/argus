@@ -566,8 +566,10 @@ export {
   MAX_INTERVAL_MINUTES,
   MIN_LOOKBACK_MINUTES,
   MAX_LOOKBACK_MINUTES,
+  MISSION_CHANNEL_PROVIDERS,
   ensureMissionSettings,
   ensureOperatingDoc,
+  isMissionChannelProvider,
   missionEngineTick,
   recordDecision,
   revertOperatingDocUpdate,
@@ -576,4 +578,4 @@ export {
   updateOperatingDocFromDecision,
   writeOperatingDoc,
 }
-export type { DecisionRecord, MissionSettingsRow, OperatingDocRow, ScanSummary }
+export type { DecisionRecord, MissionChannelProvider, MissionSettingsRow, OperatingDocRow, ScanSummary }
