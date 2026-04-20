@@ -29,6 +29,8 @@ type AgentConfig = {
   checkAgentOk: boolean | null
   checkSkillOk: boolean | null
   checkCliOk: boolean | null
+  cliPath: string | null
+  cliVersion: string | null
   lastCheckedAt: string | null
   createdAt: string
   updatedAt: string
@@ -200,13 +202,32 @@ function checkSkillInstalled(agentName: string): { installed: boolean; path: str
   return { installed: fs.existsSync(fullPath), path: fullPath }
 }
 
-async function checkCliInstalled(): Promise<{ installed: boolean; path: string | null }> {
+async function checkCliInstalled(): Promise<{
+  installed: boolean
+  path: string | null
+  version: string | null
+}> {
+  let binPath: string | null = null
   try {
     const { stdout } = await execFileAsync("which", ["argus"])
-    return { installed: true, path: stdout.trim() }
+    binPath = stdout.trim() || null
   } catch {
-    return { installed: false, path: null }
+    return { installed: false, path: null, version: null }
   }
+
+  // Best-effort version capture. `argus --version` is stable across clap
+  // versions and prints `argus <version>`. We time-box the call so a broken
+  // binary on PATH can't stall the UI's validation step.
+  let version: string | null = null
+  try {
+    const { stdout } = await execFileAsync("argus", ["--version"], { timeout: 2000 })
+    const match = stdout.match(/([0-9][0-9A-Za-z.+-]*)/)
+    version = match ? match[1] : stdout.trim() || null
+  } catch {
+    version = null
+  }
+
+  return { installed: true, path: binPath, version }
 }
 
 export { checkCliInstalled, checkSkillInstalled, detectInstalledAgents, getConfiguredAgent, parseCommand, runAgent }

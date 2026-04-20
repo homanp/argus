@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AiBrain02Icon, CancelCircleIcon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons"
+import {
+  AiBrain02Icon,
+  ArrowUpRight02Icon,
+  CancelCircleIcon,
+  CheckmarkCircle02Icon,
+  Copy01Icon,
+  Loading03Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons"
 
 import { MissionEngineCard } from "@/components/mission-engine-card"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +23,9 @@ import {
   type AgentConfig,
   type DetectedAgent,
 } from "@/lib/relay-api"
+
+const CLI_INSTALL_COMMAND = "curl -fsSL https://argus.dev/install | bash"
+const CLI_RELEASES_URL = "https://github.com/homanp/argus/releases"
 
 function agentImage(name: string, detected: DetectedAgent[]): string | null {
   const match = detected.find((d) => d.name === name)
@@ -45,6 +56,11 @@ function AgentsPage() {
   const [agentCheck, setAgentCheck] = useState<CheckStatus>("idle")
   const [skillCheck, setSkillCheck] = useState<CheckStatus>("idle")
   const [cliCheck, setCliCheck] = useState<CheckStatus>("idle")
+  const [cliPath, setCliPath] = useState<string | null>(null)
+  const [cliVersion, setCliVersion] = useState<string | null>(null)
+  const [cliCopied, setCliCopied] = useState(false)
+  const cliCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoValidatedRef = useRef(false)
 
   function applyPersistedChecks(data: AgentConfig) {
     if (data.lastCheckedAt) {
@@ -52,7 +68,26 @@ function AgentsPage() {
       setSkillCheck(data.checkSkillOk ? "pass" : "fail")
       setCliCheck(data.checkCliOk ? "pass" : "fail")
     }
+    setCliPath(data.cliPath)
+    setCliVersion(data.cliVersion)
   }
+
+  async function handleCopyInstall() {
+    try {
+      await navigator.clipboard.writeText(CLI_INSTALL_COMMAND)
+      setCliCopied(true)
+      if (cliCopyTimerRef.current) clearTimeout(cliCopyTimerRef.current)
+      cliCopyTimerRef.current = setTimeout(() => setCliCopied(false), 2000)
+    } catch {
+      // clipboard unavailable — silently no-op
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (cliCopyTimerRef.current) clearTimeout(cliCopyTimerRef.current)
+    }
+  }, [])
 
   const loadAgent = useCallback(async () => {
     try {
@@ -103,6 +138,7 @@ function AgentsPage() {
       setAgentCheck("idle")
       setSkillCheck("idle")
       setCliCheck("idle")
+      autoValidatedRef.current = false
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save agent.")
     } finally {
@@ -122,6 +158,9 @@ function AgentsPage() {
       setAgentCheck("idle")
       setSkillCheck("idle")
       setCliCheck("idle")
+      setCliPath(null)
+      setCliVersion(null)
+      autoValidatedRef.current = false
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove agent.")
     } finally {
@@ -129,7 +168,7 @@ function AgentsPage() {
     }
   }
 
-  async function handleValidateAll() {
+  const handleValidateAll = useCallback(async () => {
     setValidating(true)
     setAgentCheck("checking")
     setSkillCheck("checking")
@@ -141,6 +180,8 @@ function AgentsPage() {
       setAgentCheck(result.agent.ok ? "pass" : "fail")
       setSkillCheck(result.skill.ok ? "pass" : "fail")
       setCliCheck(result.cli.ok ? "pass" : "fail")
+      setCliPath(result.cli.path)
+      setCliVersion(result.cli.version)
       await loadAgent()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Validation failed.")
@@ -150,7 +191,17 @@ function AgentsPage() {
     } finally {
       setValidating(false)
     }
-  }
+  }, [loadAgent])
+
+  // Auto-run validation once on mount when an agent is configured so the
+  // rows reflect live state without requiring the user to click Validate.
+  useEffect(() => {
+    if (autoValidatedRef.current) return
+    if (configured && !validating) {
+      autoValidatedRef.current = true
+      void handleValidateAll()
+    }
+  }, [configured, validating, handleValidateAll])
 
   const handleEditRef = useRef(() => setEditing(true))
   handleEditRef.current = () => setEditing(true)
@@ -264,10 +315,44 @@ function AgentsPage() {
                 {skillCheck === "idle" && <span className="text-[10px] text-white/20">--</span>}
               </div>
 
-              <div className="flex items-center justify-between px-4 py-2.5">
-                <div>
-                  <p className="text-[12px] text-white/60">Argus CLI</p>
-                  <p className="font-mono text-[11px] text-white/25">curl -fsSL https://argus.dev/install | bash</p>
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[12px] text-white/60">Argus CLI</p>
+                    {cliCheck === "pass" && cliVersion && (
+                      <span className="rounded-sm bg-white/[0.05] px-1 py-[1px] font-mono text-[10px] text-white/45">
+                        v{cliVersion}
+                      </span>
+                    )}
+                  </div>
+                  {cliCheck === "pass" && cliPath ? (
+                    <p className="truncate font-mono text-[11px] text-white/25">{cliPath}</p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-mono text-[11px] text-white/25">{CLI_INSTALL_COMMAND}</p>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyInstall()}
+                        title="Copy install command"
+                        className="flex size-5 shrink-0 items-center justify-center rounded-sm text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+                      >
+                        {cliCopied ? (
+                          <HugeIcon icon={Tick02Icon} size={11} className="text-emerald-400" />
+                        ) : (
+                          <HugeIcon icon={Copy01Icon} size={11} />
+                        )}
+                      </button>
+                      <a
+                        href={CLI_RELEASES_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="View releases on GitHub"
+                        className="flex size-5 shrink-0 items-center justify-center rounded-sm text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+                      >
+                        <HugeIcon icon={ArrowUpRight02Icon} size={11} />
+                      </a>
+                    </div>
+                  )}
                 </div>
                 {cliCheck === "checking" && (
                   <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-white/30" />

@@ -2591,6 +2591,8 @@ app.post("/api/agent/validate", async (_request, response) => {
       checkAgentOk,
       checkSkillOk,
       checkCliOk,
+      cliPath: cliResult.path,
+      cliVersion: cliResult.version,
       lastCheckedAt: timestamp,
       lastUsedAt: timestamp,
       updatedAt: timestamp,
@@ -2601,7 +2603,7 @@ app.post("/api/agent/validate", async (_request, response) => {
   response.json({
     agent: { ok: checkAgentOk, exitCode: agentResult.exitCode },
     skill: { ok: checkSkillOk, path: skillResult.path },
-    cli: { ok: checkCliOk, path: cliResult.path },
+    cli: { ok: checkCliOk, path: cliResult.path, version: cliResult.version },
     checkedAt: timestamp,
   })
 })

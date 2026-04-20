@@ -457,6 +457,8 @@ type AgentConfig = {
   checkAgentOk: boolean | null
   checkSkillOk: boolean | null
   checkCliOk: boolean | null
+  cliPath: string | null
+  cliVersion: string | null
   lastCheckedAt: string | null
   createdAt: string
   updatedAt: string
@@ -508,13 +510,13 @@ async function checkAgentSkill() {
 }
 
 async function checkAgentCli() {
-  return request<{ installed: boolean; path: string | null }>("/api/agent/check-cli")
+  return request<{ installed: boolean; path: string | null; version: string | null }>("/api/agent/check-cli")
 }
 
 type ValidateResult = {
   agent: { ok: boolean; exitCode: number | null }
   skill: { ok: boolean; path: string }
-  cli: { ok: boolean; path: string | null }
+  cli: { ok: boolean; path: string | null; version: string | null }
   checkedAt: string
 }
 

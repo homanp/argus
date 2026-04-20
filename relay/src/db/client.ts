@@ -260,6 +260,12 @@ function createDatabase(databasePath: string) {
     sqlite.exec("ALTER TABLE agent ADD COLUMN check_cli_ok INTEGER")
     sqlite.exec("ALTER TABLE agent ADD COLUMN last_checked_at TEXT")
   }
+  if (!agentColumns.some((col) => col.name === "cli_path")) {
+    sqlite.exec("ALTER TABLE agent ADD COLUMN cli_path TEXT")
+  }
+  if (!agentColumns.some((col) => col.name === "cli_version")) {
+    sqlite.exec("ALTER TABLE agent ADD COLUMN cli_version TEXT")
+  }
 
   return {
     sqlite,

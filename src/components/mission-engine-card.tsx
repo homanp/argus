@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Loading03Icon, RefreshIcon, SparklesIcon } from "@hugeicons/core-free-icons"
+import { Loading03Icon, RefreshIcon } from "@hugeicons/core-free-icons"
 import { Link } from "@tanstack/react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -110,17 +110,12 @@ function MissionEngineCard() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-white/8">
-      <div className="flex items-start justify-between gap-4 border-b border-white/6 px-4 py-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-300/10 ring-1 ring-violet-300/20">
-            <HugeIcon icon={SparklesIcon} size={16} className="text-violet-200" />
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[13px] font-medium text-white/85">Mission engine</p>
-            <p className="text-[12px] text-white/45">
-              Periodically asks the agent to surface missions worth your attention.
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-4">
+        <div className="space-y-0.5">
+          <p className="text-[13px] font-medium text-white/85">Mission engine</p>
+          <p className="text-[12px] text-white/45">
+            Periodically asks the agent to surface missions worth your attention.
+          </p>
         </div>
         <Badge variant={settings.enabled ? "success" : "neutral"} size="md">
           {settings.enabled ? "Enabled" : "Disabled"}

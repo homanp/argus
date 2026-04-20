@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "format": "prettier . --check && cargo fmt --manifest-path src-tauri/Cargo.toml --all --check",
-    "format:fix": "prettier . --write && cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+    "format": "prettier . --check && cargo fmt --manifest-path src-tauri/Cargo.toml --all --check && cargo fmt --manifest-path cli/Cargo.toml --all --check",
+    "format:fix": "prettier . --write && cargo fmt --manifest-path src-tauri/Cargo.toml --all && cargo fmt --manifest-path cli/Cargo.toml --all",
     "lint": "eslint .",
     "preview": "vite preview",
     "pre-commit": "lint-staged && npm run lint && npm run build",
@@ -59,6 +59,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,css,md,yml,yaml}": "prettier --write",
-    "*.rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --all --"
+    "src-tauri/**/*.rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --all --",
+    "cli/**/*.rs": "cargo fmt --manifest-path cli/Cargo.toml --all --"
   }
 }
