@@ -57,7 +57,7 @@ function IntegrationsPage() {
   }
 
   return (
-    <section className="px-5 py-5 md:px-6">
+    <section className="px-6 py-5 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 

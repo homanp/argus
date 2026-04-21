@@ -206,7 +206,7 @@ function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarMenu>
             {recentSessions.length === 0 ? (
-              <li className="px-2.5 py-1 text-[12px] text-white/25">No recent sessions</li>
+              <li className="px-1 py-1 text-[12px] text-white/25">No recent sessions</li>
             ) : (
               <>
                 {(sessionsExpanded ? recentSessions : recentSessions.slice(0, 5)).map((session) => (

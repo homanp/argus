@@ -9,35 +9,14 @@ import {
 } from "@hugeicons/core-free-icons"
 import { useRouterState } from "@tanstack/react-router"
 
+import { GitHubConnectorSetupCard } from "@/components/github-connector-setup-card"
 import { Badge, badgeVariants } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useGitHubConnectorSetup } from "@/hooks/use-github-connector-setup"
 import { integrationCatalog } from "@/lib/integration-catalog"
-import {
-  connectGitHub,
-  getGitHubIntegration,
-  RELAY_BASE_URL,
-  sendGitHubWebhookTest,
-  setGitHubRepositorySelected,
-  syncGitHubRepositories,
-  type GitHubIntegrationRepository,
-  type GitHubIntegrationState,
-} from "@/lib/relay-api"
-
-function buildEmptyGitHubState(): GitHubIntegrationState {
-  return {
-    provider: "github",
-    displayName: "GitHub",
-    status: "not_connected",
-    apiKeyConfigured: false,
-    relayBaseUrl: RELAY_BASE_URL,
-    supportedEvents: ["push", "pull_request", "issues", "issue_comment"],
-    account: null,
-    repositories: [],
-    recentEvents: [],
-  }
-}
+import { sendGitHubWebhookTest, setGitHubRepositorySelected, type GitHubIntegrationRepository } from "@/lib/relay-api"
 
 function statusBadgeClasses(status: string) {
   switch (status) {
@@ -224,18 +203,12 @@ function IntegrationDetailPage() {
   })
   const provider = pathname.split("/").filter(Boolean).at(1) ?? "github"
   const integration = integrationCatalog.find((item) => item.provider === provider) ?? integrationCatalog[0]
-
-  const [githubState, setGithubState] = useState<GitHubIntegrationState | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [submittingApiKey, setSubmittingApiKey] = useState(false)
-  const [syncing, setSyncing] = useState(false)
+  const isGitHub = provider === "github"
+  const githubModel = useGitHubConnectorSetup({ enabled: isGitHub })
   const [busyRepositoryId, setBusyRepositoryId] = useState<string | null>(null)
-  const [apiKey, setApiKey] = useState("")
   const [expandedRepoIds, setExpandedRepoIds] = useState<Set<string>>(new Set())
   const [repoSearch, setRepoSearch] = useState("")
   const [testSuccessRepoId, setTestSuccessRepoId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   function syncNavbarBadge(status: string) {
     const badge = document.getElementById("connector-status-badge")
@@ -246,88 +219,27 @@ function IntegrationDetailPage() {
   }
 
   useEffect(() => {
-    if (provider !== "github") {
-      setLoading(false)
-      return
+    if (isGitHub && githubModel.githubState) {
+      syncNavbarBadge(githubModel.githubState.status)
     }
-
-    let cancelled = false
-
-    async function load() {
-      try {
-        const state = await getGitHubIntegration()
-        if (!cancelled) {
-          setGithubState(state)
-          syncNavbarBadge(state.status)
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setGithubState(buildEmptyGitHubState())
-          setError(loadError instanceof Error ? loadError.message : "Failed to reach the local relay.")
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-
     return () => {
-      cancelled = true
       const badge = document.getElementById("connector-status-badge")
       if (badge) badge.className = "ml-1 hidden"
     }
-  }, [provider])
-
-  async function handleConnectGitHub() {
-    if (!apiKey.trim()) {
-      setError("Enter a GitHub API key to connect the integration.")
-      return
-    }
-
-    setSubmittingApiKey(true)
-    setError(null)
-    setNotice(null)
-
-    try {
-      const state = await connectGitHub(apiKey.trim())
-      setGithubState(state)
-      syncNavbarBadge(state.status)
-      setNotice("GitHub connected. Select the repos you want to configure webhooks for.")
-      setApiKey("")
-    } catch (connectError) {
-      setError(connectError instanceof Error ? connectError.message : "Failed to connect GitHub.")
-    } finally {
-      setSubmittingApiKey(false)
-    }
-  }
-
-  async function handleSyncRepos() {
-    setSyncing(true)
-    setError(null)
-    setNotice(null)
-
-    try {
-      const state = await syncGitHubRepositories()
-      setGithubState(state)
-      setNotice("GitHub repositories refreshed from the local relay.")
-    } catch (syncError) {
-      setError(syncError instanceof Error ? syncError.message : "Failed to sync GitHub repositories.")
-    } finally {
-      setSyncing(false)
-    }
-  }
+  }, [githubModel.githubState, isGitHub])
 
   async function handleToggleRepository(repositoryId: string, enabled: boolean) {
     setBusyRepositoryId(repositoryId)
-    setError(null)
+    githubModel.setError(null)
 
     try {
       const nextState = await setGitHubRepositorySelected(repositoryId, enabled)
-      setGithubState(nextState)
+      githubModel.setGithubState(nextState)
       if (enabled) setExpandedRepoIds((current) => new Set([...current, repositoryId]))
     } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Failed to update repository selection.")
+      githubModel.setError(
+        toggleError instanceof Error ? toggleError.message : "Failed to update repository selection.",
+      )
     } finally {
       setBusyRepositoryId(null)
     }
@@ -335,16 +247,16 @@ function IntegrationDetailPage() {
 
   async function handleTestWebhook(repositoryId: string) {
     setBusyRepositoryId(repositoryId)
-    setError(null)
-    setNotice(null)
+    githubModel.setError(null)
+    githubModel.setNotice(null)
 
     try {
       const state = await sendGitHubWebhookTest(repositoryId)
-      setGithubState(state)
+      githubModel.setGithubState(state)
       setTestSuccessRepoId(repositoryId)
       setTimeout(() => setTestSuccessRepoId((current) => (current === repositoryId ? null : current)), 3000)
     } catch (testError) {
-      setError(testError instanceof Error ? testError.message : "Failed to send a webhook test.")
+      githubModel.setError(testError instanceof Error ? testError.message : "Failed to send a webhook test.")
     } finally {
       setBusyRepositoryId(null)
     }
@@ -360,7 +272,7 @@ function IntegrationDetailPage() {
   }
 
   const filteredRepositories = useMemo(() => {
-    const repos = githubState?.repositories ?? []
+    const repos = githubModel.githubState?.repositories ?? []
     const query = repoSearch.trim().toLowerCase()
     if (!query) return repos
     return repos.filter(
@@ -369,59 +281,20 @@ function IntegrationDetailPage() {
         repo.name.toLowerCase().includes(query) ||
         repo.owner.toLowerCase().includes(query),
     )
-  }, [githubState?.repositories, repoSearch])
+  }, [githubModel.githubState?.repositories, repoSearch])
 
-  const selectedCount = githubState?.repositories.filter((repo) => repo.selected).length ?? 0
+  const selectedCount = githubModel.githubState?.repositories.filter((repo) => repo.selected).length ?? 0
 
   return (
-    <section className="px-5 py-5 md:px-6">
+    <section className="px-6 py-5 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-        {notice && <p className="text-[13px] text-emerald-200/85">{notice}</p>}
-        {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
-
-        {provider !== "github" ? (
+        {!isGitHub ? (
           <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-[13px] text-white/40">
             {integration.title} is not implemented yet.
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-lg border border-white/8">
-              <div className="border-b border-white/6 px-4 py-3">
-                <p className="text-[13px] font-medium text-white/80">API key</p>
-                <p className="text-[12px] text-white/40">
-                  Paste a GitHub personal access token to load repositories this relay can monitor.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 px-4 py-3">
-                <Input
-                  type="password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.currentTarget.value)}
-                  placeholder="ghp_..."
-                />
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => void handleConnectGitHub()}
-                    disabled={submittingApiKey}
-                    className="bg-violet-300 text-violet-950 hover:bg-violet-200 disabled:bg-violet-300/60"
-                  >
-                    {submittingApiKey
-                      ? "Connecting..."
-                      : githubState?.apiKeyConfigured
-                        ? "Update API key"
-                        : "Connect GitHub"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => void handleSyncRepos()}
-                    disabled={syncing || !githubState?.apiKeyConfigured}
-                    className="border-white/10 bg-transparent text-white/65 hover:bg-white/[0.04] hover:text-white"
-                  >
-                    {syncing ? "Syncing..." : "Sync repos"}
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <GitHubConnectorSetupCard model={githubModel} />
 
             {selectedCount > 0 && (
               <div className="overflow-hidden rounded-lg border border-white/8">
@@ -430,7 +303,7 @@ function IntegrationDetailPage() {
                   <p className="text-[12px] text-white/40">Repositories with active webhook configurations.</p>
                 </div>
                 <div className="divide-y divide-white/5">
-                  {githubState?.repositories
+                  {githubModel.githubState?.repositories
                     .filter((repository) => repository.selected)
                     .map((repository) => (
                       <ExpandableRepoRow
@@ -476,7 +349,7 @@ function IntegrationDetailPage() {
                 </div>
               </div>
               <div className="max-h-[500px] divide-y divide-white/5 overflow-y-auto">
-                {loading ? (
+                {githubModel.loading ? (
                   <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-white/40">
                     <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
                     Loading repositories...
@@ -494,7 +367,7 @@ function IntegrationDetailPage() {
                       onTestWebhook={() => void handleTestWebhook(repository.id)}
                     />
                   ))
-                ) : githubState?.repositories.length ? (
+                ) : githubModel.githubState?.repositories.length ? (
                   <div className="py-6 text-center text-[13px] text-white/40">No repositories match your search.</div>
                 ) : (
                   <div className="py-6 text-center text-[13px] text-white/40">
