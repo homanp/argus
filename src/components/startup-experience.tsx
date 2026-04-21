@@ -41,7 +41,7 @@ function ProgressDots({ step }: { step: OnboardingStep }) {
   return (
     <div className="flex items-center justify-center gap-1.5">
       {dots.map((dot, index) => {
-        const isComplete = index < currentIndex
+        const isComplete = index < currentIndex || (step === "done" && index === currentIndex)
         const isActive = index === currentIndex && step !== "done"
         const dotClassName = isComplete
           ? "bg-white/82 shadow-[0_0_16px_rgba(255,255,255,0.22)]"
