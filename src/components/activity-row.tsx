@@ -180,18 +180,22 @@ function ActivityRowItem({ row, onSelect }: { row: ActivityRow; onSelect: () => 
   const title = row.kind === "session" ? row.data.name : row.data.title
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="group flex w-full items-center gap-3 border-b border-white/5 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-white/[0.02]"
-    >
-      <StatusIcon status={status} />
-      <span className="shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums text-white/35">{identifier}</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">{title}</span>
-      <div className="flex shrink-0 items-center gap-2">
-        <KindBadge row={row} />
-        <span className="w-14 text-right text-[11px] tabular-nums text-white/30">{timeAgo(row.at)}</span>
-      </div>
+    <button type="button" onClick={onSelect} className="group relative flex w-full items-center text-left">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-6 inset-y-1 rounded-md transition-colors group-hover:bg-white/[0.04] md:inset-x-8"
+      />
+      <span className="relative flex w-full items-center gap-3 px-8 py-2 md:px-10">
+        <StatusIcon status={status} />
+        <span className="shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums text-white/35">
+          {identifier}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">{title}</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <KindBadge row={row} />
+          <span className="w-14 text-right text-[11px] tabular-nums text-white/30">{timeAgo(row.at)}</span>
+        </div>
+      </span>
     </button>
   )
 }

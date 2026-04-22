@@ -94,7 +94,7 @@ function ActivityPage() {
 
   if (loading && !error) {
     return (
-      <section className="px-6 pt-1 pb-5 md:px-8">
+      <section className="pt-1 pb-5">
         <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 py-16 text-[13px] text-white/45">
           <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
           Loading activity...
@@ -104,12 +104,12 @@ function ActivityPage() {
   }
 
   return (
-    <section className="px-6 pt-1 pb-5 md:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+    <section className="pt-1 pb-5">
+      <div className="flex w-full flex-col gap-4">
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
         {allRows.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16">
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-black/30 px-5 py-16">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">
               <HugeIcon icon={Task01Icon} size={22} />
             </div>
@@ -153,7 +153,7 @@ function DetailSheet({
     <Sheet open={row !== null} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full !max-w-lg flex-col gap-0 border-l border-white/10 bg-[#0f0f13] p-0 text-white"
+        className="flex w-full !max-w-lg flex-col gap-0 border-l border-white/10 bg-transparent p-0 text-white backdrop-blur-xl"
       >
         {row && (
           <>
@@ -216,7 +216,7 @@ function SessionDetail({ row }: { row: RecentSession }) {
   const dur = row.finishedAt ? duration(row.startedAt, row.finishedAt) : row.status === "running" ? "running…" : "—"
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2.5 rounded-lg border border-white/8 bg-white/[0.02] p-4">
+      <div className="flex flex-col gap-2.5 rounded-lg border border-white/8 bg-black/30 p-4">
         <MetaRow label="Status">
           <span className="capitalize">{formatStatus(row.status)}</span>
         </MetaRow>
@@ -230,7 +230,7 @@ function SessionDetail({ row }: { row: RecentSession }) {
 
       <div className="flex flex-col gap-2">
         <p className="text-[11px] font-medium tracking-[0.02em] text-white/40">Result</p>
-        <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+        <div className="rounded-lg border border-white/8 bg-black/30 p-3">
           {row.resultMessage ? (
             <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-white/75">{row.resultMessage}</p>
           ) : (
@@ -250,7 +250,7 @@ function MissionDetail({ row }: { row: MissionSummary }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2.5 rounded-lg border border-white/8 bg-white/[0.02] p-4">
+      <div className="flex flex-col gap-2.5 rounded-lg border border-white/8 bg-black/30 p-4">
         <MetaRow label="Status">
           <span className="capitalize">{formatStatus(row.status)}</span>
         </MetaRow>
@@ -273,7 +273,7 @@ function MissionDetail({ row }: { row: MissionSummary }) {
       {row.recommendation && (
         <div className="flex flex-col gap-2">
           <p className="text-[11px] font-medium tracking-[0.02em] text-white/40">Recommendation</p>
-          <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+          <div className="rounded-lg border border-white/8 bg-black/30 p-3">
             <p className="text-[12px] leading-relaxed text-white/75">{row.recommendation}</p>
           </div>
         </div>
@@ -282,7 +282,7 @@ function MissionDetail({ row }: { row: MissionSummary }) {
       {analysisPreview && (
         <div className="flex flex-col gap-2">
           <p className="text-[11px] font-medium tracking-[0.02em] text-white/40">Analysis</p>
-          <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+          <div className="rounded-lg border border-white/8 bg-black/30 p-3">
             <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-white/70">{analysisPreview}</p>
           </div>
         </div>

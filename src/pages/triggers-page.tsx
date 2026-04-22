@@ -219,7 +219,7 @@ function TriggersPage() {
             Loading triggers...
           </div>
         ) : triggersList.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16">
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-black/30 px-5 py-16">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">
               <HugeIcon icon={ZapIcon} size={22} />
             </div>
@@ -234,10 +234,10 @@ function TriggersPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/8">
+          <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-white/8 bg-white/[0.02]">
+                <tr className="border-b border-white/8 bg-black/30">
                   <th className="px-3 py-2 text-[11px] font-medium text-white/35">Name</th>
                   <th className="px-3 py-2 text-[11px] font-medium text-white/35">Event</th>
                   <th className="hidden px-3 py-2 text-[11px] font-medium text-white/35 lg:table-cell">Prompt</th>
@@ -255,7 +255,7 @@ function TriggersPage() {
                         params: { triggerId: trigger.id },
                       })
                     }
-                    className="cursor-pointer transition-colors hover:bg-white/[0.02]"
+                    className="cursor-pointer transition-colors hover:bg-black/30"
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -280,14 +280,14 @@ function TriggersPage() {
                       )}
                     </td>
                     <td className="hidden max-w-[260px] px-3 py-2 lg:table-cell">
-                      <div className="space-y-1">
+                      <div className="flex min-w-0 items-center gap-2">
                         {trigger.actionPrompt ? (
-                          <p className="line-clamp-1 text-[12px] text-white/35">{trigger.actionPrompt}</p>
+                          <p className="min-w-0 flex-1 truncate text-[12px] text-white/35">{trigger.actionPrompt}</p>
                         ) : (
                           <span className="text-[11px] text-white/15">—</span>
                         )}
                         {trigger.channelTargets.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex shrink-0 items-center gap-1">
                             {trigger.channelTargets.map((target) => (
                               <Badge key={target} size="sm">
                                 {target}

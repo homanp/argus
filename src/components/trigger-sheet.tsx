@@ -153,7 +153,10 @@ function TriggerSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-white/8 bg-[#0d0d10] sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto border-white/8 bg-transparent backdrop-blur-xl sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle className="text-white">{editingTrigger ? "Edit trigger" : "New trigger"}</SheetTitle>
           <SheetDescription className="text-white/45">
@@ -263,7 +266,7 @@ function TriggerSheet({
                 {connectedChannels.map((channel) => (
                   <label
                     key={channel.provider}
-                    className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.02] px-3 py-2"
+                    className="flex items-center justify-between rounded-md border border-white/8 bg-black/30 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
                       <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/8">

@@ -38,7 +38,7 @@ function ChannelsPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
-        <div className="overflow-hidden rounded-lg border border-white/8">
+        <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
           {channelCatalog.map((channel, index) => {
             const isLast = index === channelCatalog.length - 1
             const status = resolveStatus(channel.provider)
