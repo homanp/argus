@@ -5,7 +5,7 @@ import { useNavigate } from "@tanstack/react-router"
 
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { ProviderGlyph } from "@/components/provider-glyph"
-import { StatusIcon, type StatusId } from "@/components/activity-row"
+import { missionStatusToStatusId, sessionStatusToStatusId, StatusIcon } from "@/components/activity-row"
 import { channelCatalog } from "@/lib/channel-catalog"
 import { integrationCatalog } from "@/lib/integration-catalog"
 import {
@@ -42,36 +42,6 @@ type PaletteResult = {
 
 const GROUP_ORDER: GroupId[] = ["Recent", "Missions", "Activity", "Triggers", "Schedules", "Connectors", "Channels"]
 
-// ── Status helpers (mirror activity-row.tsx mapping) ──────────────────────
-
-function missionStatusToStatusId(status: string): StatusId {
-  switch (status) {
-    case "awaiting_decision":
-      return "awaiting"
-    case "decided":
-      return "completed"
-    case "dismissed":
-      return "dismissed"
-    default:
-      return "awaiting"
-  }
-}
-
-function sessionStatusToStatusId(status: string): StatusId {
-  switch (status) {
-    case "running":
-      return "running"
-    case "completed":
-      return "completed"
-    case "failed":
-      return "failed"
-    case "matched":
-      return "matched"
-    default:
-      return "completed"
-  }
-}
-
 // ── Palette ───────────────────────────────────────────────────────────────
 
 function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -88,16 +58,6 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
   const inputRef = useRef<HTMLInputElement>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
-
-  const go = useCallback(
-    (fn: () => void) => {
-      onOpenChange(false)
-      // Defer navigation until after the dialog close animation starts so
-      // base-ui's focus management doesn't fight the route transition.
-      setTimeout(fn, 0)
-    },
-    [onOpenChange],
-  )
 
   const reloadAll = useCallback(() => {
     void Promise.allSettled([
@@ -124,7 +84,9 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
   // Reset query + selection whenever the dialog closes. Wrapping
   // `onOpenChange` (instead of reacting in an effect) avoids the
-  // `react-hooks/set-state-in-effect` cascade-render pattern.
+  // `react-hooks/set-state-in-effect` cascade-render pattern. All close
+  // paths — Esc, backdrop click, selecting a result via `go` — flow
+  // through here so there's a single source of truth for "on close".
   const handleOpenChange = useCallback(
     (next: boolean) => {
       if (!next) {
@@ -134,6 +96,16 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
       onOpenChange(next)
     },
     [onOpenChange],
+  )
+
+  const go = useCallback(
+    (fn: () => void) => {
+      handleOpenChange(false)
+      // Defer navigation until after the dialog close animation starts so
+      // base-ui's focus management doesn't fight the route transition.
+      setTimeout(fn, 0)
+    },
+    [handleOpenChange],
   )
 
   const handleRelayRefresh = useCallback(() => {
@@ -434,34 +406,50 @@ function PaletteHint({ keys, label }: { keys: string[]; label: string }) {
  * Wires the global ⌘K / Ctrl+K shortcut to toggle the palette. Typing K inside
  * text fields still triggers — this matches Linear/Vercel/Raycast behavior
  * where the palette takes precedence over native input.
+ *
+ * Uses a latest-ref so the window listener is installed exactly once per
+ * mount, even when the caller passes an inline arrow function that changes
+ * identity on every render (e.g. from within a component that re-renders on
+ * route changes).
  */
 function useCommandPaletteShortcut(onToggle: () => void) {
+  const ref = useRef(onToggle)
+  useLayoutEffect(() => {
+    ref.current = onToggle
+  })
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const isK = e.key === "k" || e.key === "K"
       if (!isK) return
       if (!(e.metaKey || e.ctrlKey)) return
       e.preventDefault()
-      onToggle()
+      ref.current()
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [onToggle])
+  }, [])
 }
 
 /**
  * Subscribes to the `argus:open-command-palette` custom event so any component
  * (e.g. the sidebar "Search" item) can request the palette to open without
  * needing to thread the open-state prop.
+ *
+ * Same latest-ref pattern as `useCommandPaletteShortcut` so callers don't
+ * need to memoize the callback to keep the listener stable.
  */
 function useCommandPaletteEventOpen(onOpen: () => void) {
+  const ref = useRef(onOpen)
+  useLayoutEffect(() => {
+    ref.current = onOpen
+  })
   useEffect(() => {
     function handler() {
-      onOpen()
+      ref.current()
     }
     window.addEventListener("argus:open-command-palette", handler)
     return () => window.removeEventListener("argus:open-command-palette", handler)
-  }, [onOpen])
+  }, [])
 }
 
 /**

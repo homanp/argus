@@ -18,20 +18,24 @@ type ActivityRow =
 
 type StatusId = "running" | "awaiting" | "matched" | "completed" | "failed" | "dismissed"
 
-function rowStatus(row: ActivityRow): StatusId {
-  if (row.kind === "mission") {
-    switch (row.data.status) {
-      case "awaiting_decision":
-        return "awaiting"
-      case "decided":
-        return "completed"
-      case "dismissed":
-        return "dismissed"
-      default:
-        return "awaiting"
-    }
+// Raw-string → StatusId mappers. Exported so surfaces that don't have an
+// ActivityRow (e.g. the command palette) can still render matching status
+// glyphs without drifting from the logic used here.
+function missionStatusToStatusId(status: string): StatusId {
+  switch (status) {
+    case "awaiting_decision":
+      return "awaiting"
+    case "decided":
+      return "completed"
+    case "dismissed":
+      return "dismissed"
+    default:
+      return "awaiting"
   }
-  switch (row.data.status) {
+}
+
+function sessionStatusToStatusId(status: string): StatusId {
+  switch (status) {
     case "running":
       return "running"
     case "completed":
@@ -43,6 +47,10 @@ function rowStatus(row: ActivityRow): StatusId {
     default:
       return "completed"
   }
+}
+
+function rowStatus(row: ActivityRow): StatusId {
+  return row.kind === "mission" ? missionStatusToStatusId(row.data.status) : sessionStatusToStatusId(row.data.status)
 }
 
 function rowIdentifier(row: ActivityRow): string {
@@ -200,5 +208,14 @@ function ActivityRowItem({ row, onSelect }: { row: ActivityRow; onSelect: () => 
   )
 }
 
-export { ActivityRowItem, groupRowsByStatus, KindBadge, rowIdentifier, rowStatus, StatusIcon }
+export {
+  ActivityRowItem,
+  groupRowsByStatus,
+  KindBadge,
+  missionStatusToStatusId,
+  rowIdentifier,
+  rowStatus,
+  sessionStatusToStatusId,
+  StatusIcon,
+}
 export type { ActivityRow, StatusId }
