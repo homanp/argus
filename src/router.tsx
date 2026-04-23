@@ -22,8 +22,11 @@ import {
 
 import { Link } from "@tanstack/react-router"
 
+import { useState } from "react"
+
 import App from "@/App"
 import { AppSidebar } from "@/components/app-sidebar"
+import { CommandPalette, useCommandPaletteEventOpen, useCommandPaletteShortcut } from "@/components/command-palette"
 import { badgeVariants } from "@/components/ui/badge"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import { Button } from "@/components/ui/button"
@@ -92,6 +95,9 @@ function RootLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  useCommandPaletteShortcut(() => setPaletteOpen((v) => !v))
+  useCommandPaletteEventOpen(() => setPaletteOpen(true))
   const isConnectorsRoute = pathname === "/connectors" || pathname.startsWith("/connectors/")
   const isTriggersRoute = pathname === "/triggers" || pathname.startsWith("/triggers/")
   const isTriggersDetail = pathname.startsWith("/triggers/") && pathname !== "/triggers"
@@ -416,22 +422,6 @@ function RootLayout() {
                   </Button>
                 </ButtonGroup>
               )}
-              {pathname === "/" && (
-                <>
-                  <Button
-                    variant="ghost"
-                    className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
-                  >
-                    Filter
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-7 rounded-md px-2.5 text-[11px] font-normal text-white/40 hover:bg-white/[0.03] hover:text-white/70"
-                  >
-                    Mark all reviewed
-                  </Button>
-                </>
-              )}
               {isMissionDetail && (
                 <Button
                   variant="outline"
@@ -449,6 +439,7 @@ function RootLayout() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   )
 }
