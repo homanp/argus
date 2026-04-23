@@ -5,6 +5,18 @@ All notable changes to **argus-cli** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-04-23
+
+### Changed
+
+- `install.sh` now **builds the CLI from source by default** (clone + `cargo build --release`). Use `ARGUS_VERSION=cli-vX.Y.Z` or `ARGUS_RELEASE=1` to install a prebuilt release tarball when one exists.
+- The installer **appends `~/.argus/bin` to `PATH`** in the user’s shell rc files (skippable with `ARGUS_NO_MODIFY_PATH=1`).
+
+### Fixed
+
+- Bash login setup no longer risks **shadowing an existing `~/.profile`** when creating `~/.bash_profile`.
+- PATH snippets are written only into **rc files for shells the installer detects** as in use (instead of always editing every supported shell).
+
 ## [0.1.0] - 2026-04-20
 
 ### Added
