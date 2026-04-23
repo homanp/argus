@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
-import { Alert02Icon, GithubIcon, MoreHorizontalIcon, Settings01Icon } from "@hugeicons/core-free-icons"
+import { Alert02Icon, GithubIcon, MoreHorizontalIcon, Search01Icon, Settings01Icon } from "@hugeicons/core-free-icons"
 
+import { useCommandPaletteShortcutLabel } from "@/components/command-palette"
 import { HugeIcon } from "@/components/ui/huge-icon"
 import {
   Sidebar,
@@ -29,6 +30,11 @@ function AppSidebar() {
   })
   const navigate = useNavigate()
   const isActivePath = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`))
+  const shortcutLabel = useCommandPaletteShortcutLabel()
+
+  function openCommandPalette() {
+    window.dispatchEvent(new CustomEvent("argus:open-command-palette"))
+  }
 
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   const [channelCount, setChannelCount] = useState<number | null>(null)
@@ -120,6 +126,17 @@ function AppSidebar() {
       <SidebarContent className="pt-1 pb-2">
         <SidebarGroup className="pt-0">
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={openCommandPalette}
+                className="h-7 rounded-md px-2.5 text-[13px] text-white/70 hover:bg-white/5 hover:text-white"
+                tooltip="Search"
+              >
+                <HugeIcon icon={Search01Icon} size={16} className="text-white/50" />
+                <span>Search</span>
+                <span className="ml-auto text-[11px] tabular-nums text-white/40">{shortcutLabel}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             {resolvedPrimaryNav.map((item) => (
               <SidebarMenuItem key={item.title}>
                 {item.href ? (
