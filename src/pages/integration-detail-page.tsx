@@ -144,7 +144,7 @@ function ExpandableRepoRow({
               )}
 
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
+                <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-black/30 px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-[0.08em] text-white/30">Payload URL</p>
                     <p className="truncate font-mono text-[11px] text-white/70">{repository.webhookUrl}</p>
@@ -152,7 +152,7 @@ function ExpandableRepoRow({
                   <CopyIconButton value={repository.webhookUrl!} />
                 </div>
                 {!repository.webhookManaged && (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-black/30 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-[10px] uppercase tracking-[0.08em] text-white/30">Secret</p>
                       <p className="truncate font-mono text-[11px] text-white/70">{repository.webhookSecret}</p>
@@ -289,7 +289,7 @@ function IntegrationDetailPage() {
     <section className="px-6 py-5 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         {!isGitHub ? (
-          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-5 py-8 text-center text-[13px] text-white/40">
+          <div className="rounded-lg border border-dashed border-white/10 bg-black/30 px-5 py-8 text-center text-[13px] text-white/40">
             {integration.title} is not implemented yet.
           </div>
         ) : (
@@ -297,7 +297,7 @@ function IntegrationDetailPage() {
             <GitHubConnectorSetupCard model={githubModel} />
 
             {selectedCount > 0 && (
-              <div className="overflow-hidden rounded-lg border border-white/8">
+              <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
                 <div className="border-b border-white/6 px-4 py-3">
                   <p className="text-[13px] font-medium text-white/80">Connected repositories</p>
                   <p className="text-[12px] text-white/40">Repositories with active webhook configurations.</p>
@@ -321,7 +321,7 @@ function IntegrationDetailPage() {
               </div>
             )}
 
-            <div className="overflow-hidden rounded-lg border border-white/8">
+            <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
               <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
                 <div>
                   <p className="text-[13px] font-medium text-white/80">All repositories</p>

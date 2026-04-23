@@ -101,7 +101,7 @@ function AgentSetupCard({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="overflow-hidden rounded-lg border border-white/8">
+            <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
               <div className="flex items-center gap-4 px-4 py-4">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] ring-1 ring-white/8">
                   <AgentLogo
@@ -125,8 +125,8 @@ function AgentSetupCard({
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-white/8">
-              <div className="flex items-center justify-between border-b border-white/6 bg-white/[0.02] px-4 py-2">
+            <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
+              <div className="flex items-center justify-between border-b border-white/6 bg-black/30 px-4 py-2">
                 <p className="text-[12px] font-medium text-white/50">Setup checks</p>
                 <Button
                   onClick={() => void model.handleValidateAll()}
@@ -248,7 +248,7 @@ function AgentSetupCard({
               className={
                 compact
                   ? "flex flex-col items-center gap-4 px-1 py-6"
-                  : "flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-12"
+                  : "flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-black/30 px-5 py-12"
               }
             >
               <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">

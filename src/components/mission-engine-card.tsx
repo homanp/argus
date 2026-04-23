@@ -160,7 +160,7 @@ function MissionEngineCard() {
 
   if (!settings) {
     return (
-      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4">
+      <div className="rounded-lg border border-white/8 bg-black/30 p-4">
         <p className="flex items-center gap-1.5 text-[12px] text-white/40">
           <HugeIcon icon={Loading03Icon} size={12} className="animate-spin" />
           Loading mission engine…
@@ -170,7 +170,7 @@ function MissionEngineCard() {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/8">
+    <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
       <div className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-4">
         <div className="space-y-0.5">
           <p className="text-[13px] font-medium text-white/85">Mission engine</p>
@@ -234,8 +234,8 @@ function MissionEngineCard() {
                 <label
                   key={channel.provider}
                   className={cn(
-                    "flex cursor-pointer items-center justify-between rounded-md border bg-white/[0.02] px-3 py-2 transition-colors",
-                    checked ? "border-violet-300/40 bg-violet-300/[0.04]" : "border-white/8 hover:bg-white/[0.03]",
+                    "flex cursor-pointer items-center justify-between rounded-md border bg-black/30 px-3 py-2 transition-colors",
+                    checked ? "border-violet-300/40 bg-violet-300/[0.04]" : "border-white/8 hover:bg-black/40",
                     saving && "pointer-events-none opacity-60",
                   )}
                 >

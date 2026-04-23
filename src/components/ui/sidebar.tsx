@@ -149,7 +149,7 @@ function Sidebar({
           "fixed hidden w-(--sidebar-width) bg-sidebar backdrop-blur-xl md:flex",
           variant === "floating" || variant === "inset"
             ? "inset-y-0 z-10 h-svh p-2 data-[side=left]:left-0 data-[side=right]:right-0"
-            : "z-50 top-2 bottom-2 left-2 h-[calc(100svh-16px)] rounded-xl border border-white/[0.06]",
+            : "z-50 top-2 bottom-2 left-2 h-[calc(100svh-16px)] rounded-xl border border-white/12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]",
           className,
         )}
         {...props}
@@ -215,7 +215,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
+        "relative flex w-full flex-1 flex-col bg-transparent md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
         className,
       )}
       {...props}

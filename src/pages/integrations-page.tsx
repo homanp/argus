@@ -61,7 +61,7 @@ function IntegrationsPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
-        <div className="overflow-hidden rounded-lg border border-white/8">
+        <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
           {integrationCatalog.map((integration, index) => {
             const status = resolveStatus(integration.provider)
             const isLast = index === integrationCatalog.length - 1

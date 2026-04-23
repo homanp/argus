@@ -197,7 +197,10 @@ function ScheduleSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto border-white/8 bg-[#0d0d10] sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto border-white/8 bg-transparent backdrop-blur-xl sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle className="text-white">{editingSchedule ? "Edit schedule" : "New schedule"}</SheetTitle>
           <SheetDescription className="text-white/45">
@@ -372,7 +375,7 @@ function ScheduleSheet({
             {cronError && <p className="text-[11px] text-rose-300/80">{cronError}</p>}
 
             {effectiveCron && !cronError && (
-              <div className="rounded-md border border-white/6 bg-white/[0.02] px-3 py-2">
+              <div className="rounded-md border border-white/6 bg-black/30 px-3 py-2">
                 <p className="text-[11px] font-medium text-white/45">{describeCron(effectiveCron)}</p>
                 {nextRuns.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">

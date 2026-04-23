@@ -131,7 +131,7 @@ function OperatingDocEditor({ doc, onSaved }: { doc: OperatingDoc; onSaved: (nex
           className="h-[320px] w-full resize-y rounded-lg border border-white/10 bg-black/20 p-4 font-mono text-[12px] leading-relaxed text-white/80 focus:border-violet-300/40 focus:outline-none"
         />
       ) : (
-        <div className="rounded-lg border border-white/8 bg-white/[0.02] p-5 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-3 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[12px] [&_h2]:font-semibold [&_h2]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
+        <div className="rounded-lg border border-white/8 bg-black/30 p-5 text-[13px] leading-7 text-white/80 [&_code]:rounded [&_code]:bg-white/6 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px] [&_code]:text-white/90 [&_h1]:mt-0 [&_h1]:mb-3 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[12px] [&_h2]:font-semibold [&_h2]:text-white [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold [&_strong]:text-white">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.markdown || "_empty_"}</ReactMarkdown>
         </div>
       )}
@@ -151,7 +151,7 @@ function ScanSummaryCard({
   const summary = settings?.lastScanSummary ?? null
   const disabled = !settings?.enabled
   return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-5">
+    <div className="rounded-lg border border-white/8 bg-black/30 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-[12px] font-medium text-white/40">Last scan</p>
@@ -215,7 +215,7 @@ function ScanHeadline({ summary, settings }: { summary: MissionScanSummary | nul
 
 function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div className="rounded-md border border-white/8 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-white/8 bg-black/30 px-3 py-2">
       <p className="text-[11px] text-white/40">{label}</p>
       <p
         className={cn(
@@ -235,7 +235,7 @@ function SuppressionRow({ suppression }: { suppression: MissionSuppression }) {
   const title = candidate?.title ?? "Unknown candidate"
 
   return (
-    <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.02]">
+    <div className="overflow-hidden rounded-md border border-white/8 bg-black/30">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -275,7 +275,7 @@ function OperatingDocUpdateRow({
   }
 
   return (
-    <div className="space-y-2 rounded-md border border-white/8 bg-white/[0.02] px-4 py-3">
+    <div className="space-y-2 rounded-md border border-white/8 bg-black/30 px-4 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[11px] text-white/45">
           <Badge size="sm" variant="neutral" className="text-[10px] capitalize">
@@ -395,7 +395,7 @@ function InsightsPage() {
             </Badge>
           </div>
           {suppressionsGrouped.length === 0 ? (
-            <div className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-4 py-4 text-[13px] text-white/40">
+            <div className="rounded-md border border-dashed border-white/10 bg-black/30 px-4 py-4 text-[13px] text-white/40">
               No suppressions yet. After the next scan, Argus will show candidates it declined to surface, with reasons.
             </div>
           ) : (

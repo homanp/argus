@@ -68,7 +68,7 @@ function ExecutionRow({ execution }: { execution: TriggerExecution }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/[0.02]"
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-black/30"
       >
         <div className={`size-1.5 shrink-0 rounded-full ${statusDot[execution.status] ?? statusDot.matched}`} />
         <div className="min-w-0 flex-1">
@@ -239,7 +239,7 @@ function TriggerDetailPage() {
   return (
     <section className="px-6 py-5 md:px-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-        <div className="overflow-hidden rounded-lg border border-white/8">
+        <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
           <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">
             <Badge size="sm">{trigger.provider}</Badge>
             <Badge variant="violet" size="sm">
@@ -254,7 +254,7 @@ function TriggerDetailPage() {
                 {trigger.conditions.map((condition, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 rounded-md border border-white/8 bg-white/[0.02] px-3 py-1.5"
+                    className="flex items-center gap-2 rounded-md border border-white/8 bg-black/30 px-3 py-1.5"
                   >
                     <code className="text-[11px] text-white/65">{condition.field}</code>
                     <span className="text-[11px] text-white/30">{condition.operator.replaceAll("_", " ")}</span>
@@ -290,7 +290,7 @@ function TriggerDetailPage() {
           )}
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-white/8">
+        <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
           <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
             <div>
               <p className="text-[13px] font-medium text-white/80">Execution history</p>

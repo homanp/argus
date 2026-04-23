@@ -242,12 +242,12 @@ function ChannelDetailPage() {
         {error && <p className="text-[13px] text-rose-200/85">{error}</p>}
 
         {loading ? (
-          <div className="rounded-lg border border-white/8 px-5 py-8 text-center text-[13px] text-white/40">
+          <div className="rounded-lg border border-white/8 bg-sidebar px-5 py-8 text-center text-[13px] text-white/40">
             Loading...
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-lg border border-white/8">
+            <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
               <div className="border-b border-white/6 px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] ring-1 ring-white/8">
@@ -286,7 +286,7 @@ function ChannelDetailPage() {
                 ))}
 
                 {isTelegram && (
-                  <div className="space-y-3 rounded-md border border-white/8 bg-white/[0.02] px-3 py-3">
+                  <div className="space-y-3 rounded-md border border-white/8 bg-black/30 px-3 py-3">
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"

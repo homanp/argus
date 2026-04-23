@@ -131,7 +131,7 @@ function SignalCard({ signal }: { signal: MissionSignal }) {
   const comment = `${signal.source ? `${signal.source}/` : ""}${signal.eventType ?? "event"}`
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/8 bg-white/[0.02]">
+    <div className="overflow-hidden rounded-lg border border-white/8 bg-black/30">
       <div className="flex items-center gap-2 border-b border-white/6 px-4 py-3">
         <Badge variant="subtle" size="md" className="text-white/80">
           <ProviderGlyph provider={provider} size={14} iconClassName="text-white/60" />
@@ -180,7 +180,7 @@ function ArtifactCard({ action }: { action: MissionAction }) {
   const recipientLabel = ARTIFACT_RECIPIENT_LABEL[artifact.kind] ?? "For"
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/8 bg-white/[0.02]">
+    <div className="overflow-hidden rounded-lg border border-white/8 bg-black/30">
       <div className="flex items-start justify-between gap-3 border-b border-white/6 px-5 py-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
@@ -455,7 +455,7 @@ function MissionDetailPage() {
               </p>
             </div>
             {signals.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-4 text-[13px] text-white/40">
+              <div className="rounded-lg border border-dashed border-white/10 bg-black/30 px-4 py-4 text-[13px] text-white/40">
                 No signal payloads attached to this mission.
               </div>
             ) : (
@@ -468,7 +468,7 @@ function MissionDetailPage() {
           </div>
 
           {executions.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-white/8">
+            <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
               <div className="border-b border-white/6 px-5 py-3">
                 <p className="text-[12px] font-medium text-white/40">Decision history</p>
               </div>

@@ -36,7 +36,7 @@ function GitHubConnectorSetupCard({
       <div
         className={cn(
           "overflow-hidden",
-          compact ? "rounded-none border-0 bg-transparent" : "rounded-lg border border-white/8",
+          compact ? "rounded-none border-0 bg-transparent" : "rounded-lg border border-white/8 bg-sidebar",
           connected && compact && "border-emerald-300/12 bg-emerald-300/[0.04]",
         )}
       >

@@ -14,7 +14,7 @@ document.documentElement.style.colorScheme = "dark"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <div className="min-h-svh bg-background text-foreground">
+    <div className="min-h-svh bg-transparent text-foreground">
       <TooltipProvider>
         <RouterProvider router={router} />
         <StartupExperience />

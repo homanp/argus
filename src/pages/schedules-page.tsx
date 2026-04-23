@@ -177,7 +177,7 @@ function SchedulesPage() {
             Loading schedules...
           </div>
         ) : schedulesList.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16">
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/10 bg-black/30 px-5 py-16">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/40 ring-1 ring-white/10">
               <HugeIcon icon={Calendar03Icon} size={22} />
             </div>
@@ -192,10 +192,10 @@ function SchedulesPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/8">
+          <div className="overflow-hidden rounded-lg border border-white/8 bg-sidebar">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-white/8 bg-white/[0.02]">
+                <tr className="border-b border-white/8 bg-black/30">
                   <th className="px-3 py-2 text-[11px] font-medium text-white/35">Name</th>
                   <th className="px-3 py-2 text-[11px] font-medium text-white/35">Schedule</th>
                   <th className="hidden px-3 py-2 text-[11px] font-medium text-white/35 lg:table-cell">Prompt</th>
@@ -214,7 +214,7 @@ function SchedulesPage() {
                         params: { scheduleId: schedule.id },
                       })
                     }
-                    className="cursor-pointer transition-colors hover:bg-white/[0.02]"
+                    className="cursor-pointer transition-colors hover:bg-black/30"
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">

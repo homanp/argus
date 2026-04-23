@@ -84,19 +84,19 @@
 }
 
 .dark {
-  --background: rgb(5 5 7 / 0.82);
+  --background: rgb(12 12 16 / 0.55);
   --foreground: #f7f7f8;
-  --card: rgb(11 11 16 / 0.75);
+  --card: rgb(18 18 24 / 0.55);
   --card-foreground: #f7f7f8;
-  --popover: rgb(11 11 16 / 0.85);
+  --popover: rgb(18 18 24 / 0.78);
   --popover-foreground: #f7f7f8;
   --primary: #c4b5fd;
   --primary-foreground: #1a102f;
-  --secondary: rgb(20 20 26 / 0.7);
+  --secondary: rgb(22 22 28 / 0.5);
   --secondary-foreground: #f7f7f8;
-  --muted: rgb(18 18 24 / 0.7);
+  --muted: rgb(20 20 26 / 0.5);
   --muted-foreground: #8d8d98;
-  --accent: rgb(21 21 27 / 0.7);
+  --accent: rgb(22 22 28 / 0.5);
   --accent-foreground: #f7f7f8;
   --destructive: #f87171;
   --border: rgb(255 255 255 / 0.08);
@@ -107,7 +107,7 @@
   --chart-3: #71717a;
   --chart-4: #52525b;
   --chart-5: #27272a;
-  --sidebar: rgb(10 10 14 / 0.82);
+  --sidebar: rgb(12 12 16 / 0.55);
   --sidebar-foreground: #f7f7f8;
   --sidebar-primary: #c4b5fd;
   --sidebar-primary-foreground: #1a102f;
