@@ -235,7 +235,7 @@ function MissionEngineCard() {
                   key={channel.provider}
                   className={cn(
                     "flex cursor-pointer items-center justify-between rounded-md border bg-black/30 px-3 py-2 transition-colors",
-                    checked ? "border-violet-300/40 bg-violet-300/[0.04]" : "border-white/8 hover:bg-white/[0.03]",
+                    checked ? "border-violet-300/40 bg-violet-300/[0.04]" : "border-white/8 hover:bg-black/40",
                     saving && "pointer-events-none opacity-60",
                   )}
                 >

@@ -191,10 +191,10 @@ function ActivityRowItem({ row, onSelect }: { row: ActivityRow; onSelect: () => 
           {identifier}
         </span>
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">{title}</span>
-        <div className="flex shrink-0 items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2">
           <KindBadge row={row} />
           <span className="w-14 text-right text-[11px] tabular-nums text-white/30">{timeAgo(row.at)}</span>
-        </div>
+        </span>
       </span>
     </button>
   )
